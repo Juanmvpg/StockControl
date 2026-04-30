@@ -1411,7 +1411,7 @@ class ReporteCapitalDialog(tk.Toplevel):
         for c in self.categorias:
             self.lb_cat.insert("end", c)
             self.lb_cat.selection_set("end")
-        self.lb_cat.bind("<<ListboxSelect>>", lambda e: self._calcular())
+        self.lb_cat.bind("<<ListboxSelect>>", lambda e: self.after(10, self._calcular))
         
         # Col 2: Marcas
         col_marca = tk.Frame(body, bg=BG)
@@ -1426,7 +1426,7 @@ class ReporteCapitalDialog(tk.Toplevel):
         for m in self.marcas:
             self.lb_marca.insert("end", m)
             self.lb_marca.selection_set("end")
-        self.lb_marca.bind("<<ListboxSelect>>", lambda e: self._calcular())
+        self.lb_marca.bind("<<ListboxSelect>>", lambda e: self.after(10, self._calcular))
 
         # Col 3: Excluidos
         col_prod = tk.Frame(body, bg=BG)
@@ -1463,14 +1463,14 @@ class ReporteCapitalDialog(tk.Toplevel):
             self.lb_cat.selection_clear(0, "end")
         else:
             self.lb_cat.selection_set(0, "end")
-        self._calcular()
+        self.after(10, self._calcular)
 
     def _toggle_marca(self):
         if len(self.lb_marca.curselection()) > 0:
             self.lb_marca.selection_clear(0, "end")
         else:
             self.lb_marca.selection_set(0, "end")
-        self._calcular()
+        self.after(10, self._calcular)
         
     def _on_search(self, *args):
         q = self.v_buscar.get().strip().lower()
