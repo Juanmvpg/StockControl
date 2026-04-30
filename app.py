@@ -968,7 +968,7 @@ class SalidaMultipleDialog(tk.Toplevel):
         for p in productos_seleccionados:
             self.items[p["id"]] = {
                 "prod": p, 
-                "cant": 1, 
+                "cant": p.get("_init_cant", 1), 
                 "nota": "", 
                 "desc_val": 0, 
                 "desc_tipo": "%", 
