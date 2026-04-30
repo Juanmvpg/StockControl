@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparador de Listas - Proveedor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+        }
+        
+        .upload-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .upload-box {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            transition: all 0.3s;
+            background: #f8f9ff;
+        }
+        
+        .upload-box:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+        
+        .upload-box.has-file {
+            border-color: #4caf50;
+            background: #e8f5e9;
+        }
+        
+        .upload-box h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+        
+        .file-input-label {
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-block;
+        }
+        
+        .file-input-label:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .file-name {
+            margin-top: 10px;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .file-name.success {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        
+        .compare-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 50px;
+            border-radius: 30px;
+            font-size: 1.2em;
+            cursor: pointer;
+            display: block;
+            margin: 30px auto;
+            transition: all 0.3s;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .compare-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        }
+        
+        .compare-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        .results {
+            display: none;
+            margin-top: 40px;
+        }
+        
+        .results.show {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .summary-card {
+            padding: 25px;
+            border-radius: 15px;
+            color: white;
+            text-align: center;
+        }
+        
+        .summary-card.price-increase {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .summary-card.price-decrease {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        .summary-card.new-products {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+        
+        .summary-card h3 {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        
+        .summary-card p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section-title {
+            color: #333;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        .product-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .product-table thead {
+            background: #667eea;
+            color: white;
+        }
+        
+        .product-table th,
+        .product-table td {
+            padding: 15px;
+            text-align: left;
+        }
+        
+        .product-table tbody tr {
+            border-bottom: 1px solid #eee;
+            transition: background 0.3s;
+        }
+        
+        .product-table tbody tr:hover {
+            background: #f8f9ff;
+        }
+        
+        .price-up {
+            color: #f5576c;
+            font-weight: bold;
+        }
+        
+        .price-down {
+            color: #00f2fe;
+            font-weight: bold;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        
+        .badge.new {
+            background: #43e97b;
+            color: white;
+        }
+        
+        .badge.increase {
+            background: #f5576c;
+            color: white;
+        }
+        
+        .badge.decrease {
+            background: #00f2fe;
+            color: white;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 1.1em;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .export-btn {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 20px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.3s;
+        }
+        
+        .export-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+        
+        @media (max-width: 768px) {
+            .upload-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .summary-cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .product-table {
+                font-size: 0.9em;
+            }
+            
+            .product-table th,
+            .product-table td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Comparador de Listas</h1>
+        <p class="subtitle">Compara listas de precios del proveedor y detecta cambios automáticamente</p>
+        
+        <div class="upload-section">
+            <div class="upload-box" id="oldBox">
+                <h3>📋 Lista Anterior (Vieja)</h3>
+                <p style="color: #666; margin-bottom: 15px;">Sube el archivo del mes anterior</p>
+                <div class="file-input-wrapper">
+                    <input type="file" id="oldFile" accept=".xlsx,.xls,.csv" onchange="handleFileUpload('old')">
+                    <label for="oldFile" class="file-input-label">Seleccionar archivo</label>
+                </div>
+                <div class="file-name" id="oldFileName">Ningún archivo seleccionado</div>
+            </div>
+            
+            <div class="upload-box" id="newBox">
+                <h3>📋 Lista Nueva (Actual)</h3>
+                <p style="color: #666; margin-bottom: 15px;">Sube el archivo del mes actual</p>
+                <div class="file-input-wrapper">
+                    <input type="file" id="newFile" accept=".xlsx,.xls,.csv" onchange="handleFileUpload('new')">
+                    <label for="newFile" class="file-input-label">Seleccionar archivo</label>
+                </div>
+                <div class="file-name" id="newFileName">Ningún archivo seleccionado</div>
+            </div>
+        </div>
+        
+        <button class="compare-btn" id="compareBtn" onclick="compareFiles()" disabled>
+            🔍 Comparar Listas
+        </button>
+        
+        <div class="loading" id="loading">
+            Procesando archivos... ⏳
+        </div>
+        
+        <div class="results" id="results">
+            <div class="summary-cards">
+                <div class="summary-card price-increase">
+                    <h3 id="increaseCount">0</h3>
+                    <p>Precios Aumentados</p>
+                </div>
+                <div class="summary-card price-decrease">
+                    <h3 id="decreaseCount">0</h3>
+                    <p>Precios Reducidos</p>
+                </div>
+                <div class="summary-card new-products">
+                    <h3 id="newCount">0</h3>
+                    <p>Productos Nuevos</p>
+                </div>
+            </div>
+            
+            <!-- Productos con precio aumentado -->
+            <div class="section" id="increasedSection" style="display: none;">
+                <div class="section-title">📈 Productos con Precio Aumentado</div>
+                <table class="product-table" id="increasedTable">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Categoría</th>
+                            <th>Precio Anterior</th>
+                            <th>Precio Nuevo</th>
+                            <th>Diferencia</th>
+                            <th>% Cambio</th>
+                        </tr>
+                    </thead>
+                    <tbody id="increasedBody"></tbody>
+                </table>
+            </div>
+            
+            <!-- Productos con precio reducido -->
+            <div class="section" id="decreasedSection" style="display: none;">
+                <div class="section-title">📉 Productos con Precio Reducido</div>
+                <table class="product-table" id="decreasedTable">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Categoría</th>
+                            <th>Precio Anterior</th>
+                            <th>Precio Nuevo</th>
+                            <th>Diferencia</th>
+                            <th>% Cambio</th>
+                        </tr>
+                    </thead>
+                    <tbody id="decreasedBody"></tbody>
+                </table>
+            </div>
+            
+            <!-- Productos nuevos -->
+            <div class="section" id="newSection" style="display: none;">
+                <div class="section-title">✨ Productos Nuevos</div>
+                <table class="product-table" id="newTable">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Categoría</th>
+                            <th>Precio</th>
+                        </tr>
+                    </thead>
+                    <tbody id="newBody"></tbody>
+                </table>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+                <button class="export-btn" onclick="exportToExcel()">📥 Exportar Resultados a Excel</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let oldData = null;
+        let newData = null;
+        let comparisonResults = null;
+        
+        function handleFileUpload(type) {
+            const fileInput = document.getElementById(type + 'File');
+            const fileName = document.getElementById(type + 'FileName');
+            const box = document.getElementById(type + 'Box');
+            const file = fileInput.files[0];
+            
+            if (file) {
+                fileName.textContent = '✓ ' + file.name;
+                fileName.classList.add('success');
+                box.classList.add('has-file');
+                
+                const ext = file.name.split('.').pop().toLowerCase();
+                
+                if (ext === 'csv') {
+                    Papa.parse(file, {
+                        complete: function(results) {
+                            const jsonData = results.data;
+                            if (type === 'old') {
+                                oldData = parseData(jsonData);
+                            } else {
+                                newData = parseData(jsonData);
+                            }
+                            checkReadyToCompare();
+                        },
+                        error: function(err) {
+                            alert('Error al leer el CSV: ' + err.message);
+                        }
+                    });
+                } else {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const jsonData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+                        
+                        if (type === 'old') {
+                            oldData = parseData(jsonData);
+                        } else {
+                            newData = parseData(jsonData);
+                        }
+                        
+                        checkReadyToCompare();
+                    };
+                    reader.readAsArrayBuffer(file);
+                }
+            }
+        }
+        
+        function parseData(rawData) {
+            const products = {};
+            
+            for (let row of rawData) {
+                // Ignorar filas vacías
+                if (!row[0] || row[0].trim() === '') continue;
+                
+                const productName = String(row[0]).trim();
+                let priceStr = String(row[1] || "").replace('$', '').replace(',', '.').trim();
+                const price = parseFloat(priceStr);
+                const category = row[2] ? String(row[2]).trim() : 'Sin categoría';
+                
+                // Solo agregar si tiene precio válido
+                if (!isNaN(price) && price > 0) {
+                    products[productName] = {
+                        name: productName,
+                        price: price,
+                        category: category
+                    };
+                }
+            }
+            
+            return products;
+        }
+        
+        function checkReadyToCompare() {
+            const compareBtn = document.getElementById('compareBtn');
+            if (oldData && newData) {
+                compareBtn.disabled = false;
+            }
+        }
+        
+        function compareFiles() {
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('results').classList.remove('show');
+            
+            setTimeout(() => {
+                const increased = [];
+                const decreased = [];
+                const newProducts = [];
+                
+                // Buscar cambios de precio
+                for (let productName in newData) {
+                    const newProduct = newData[productName];
+                    const oldProduct = oldData[productName];
+                    
+                    if (oldProduct) {
+                        const priceDiff = newProduct.price - oldProduct.price;
+                        const percentChange = ((priceDiff / oldProduct.price) * 100).toFixed(2);
+                        
+                        if (priceDiff > 0) {
+                            increased.push({
+                                ...newProduct,
+                                oldPrice: oldProduct.price,
+                                diff: priceDiff,
+                                percentChange: percentChange
+                            });
+                        } else if (priceDiff < 0) {
+                            decreased.push({
+                                ...newProduct,
+                                oldPrice: oldProduct.price,
+                                diff: priceDiff,
+                                percentChange: percentChange
+                            });
+                        }
+                    } else {
+                        // Producto nuevo
+                        newProducts.push(newProduct);
+                    }
+                }
+                
+                // Ordenar por % de cambio
+                increased.sort((a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange));
+                decreased.sort((a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange));
+                
+                comparisonResults = { increased, decreased, newProducts };
+                displayResults(increased, decreased, newProducts);
+                
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('results').classList.add('show');
+            }, 500);
+        }
+        
+        function displayResults(increased, decreased, newProducts) {
+            // Actualizar contadores
+            document.getElementById('increaseCount').textContent = increased.length;
+            document.getElementById('decreaseCount').textContent = decreased.length;
+            document.getElementById('newCount').textContent = newProducts.length;
+            
+            // Mostrar/ocultar secciones
+            displaySection('increasedSection', 'increasedBody', increased, 'increase');
+            displaySection('decreasedSection', 'decreasedBody', decreased, 'decrease');
+            displaySection('newSection', 'newBody', newProducts, 'new');
+        }
+        
+        function displaySection(sectionId, bodyId, data, type) {
+            const section = document.getElementById(sectionId);
+            const tbody = document.getElementById(bodyId);
+            
+            if (data.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+            
+            section.style.display = 'block';
+            tbody.innerHTML = '';
+            
+            for (let item of data) {
+                const row = document.createElement('tr');
+                
+                if (type === 'new') {
+                    row.innerHTML = `
+                        <td><span class="badge new">NUEVO</span> ${item.name}</td>
+                        <td>${item.category}</td>
+                        <td>$${item.price.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+                    `;
+                } else {
+                    const diffClass = type === 'increase' ? 'price-up' : 'price-down';
+                    const badgeClass = type === 'increase' ? 'increase' : 'decrease';
+                    const arrow = type === 'increase' ? '↑' : '↓';
+                    
+                    row.innerHTML = `
+                        <td>${item.name}</td>
+                        <td>${item.category}</td>
+                        <td>$${item.oldPrice.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+                        <td>$${item.price.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+                        <td class="${diffClass}">${arrow} $${Math.abs(item.diff).toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+                        <td><span class="badge ${badgeClass}">${arrow} ${Math.abs(item.percentChange)}%</span></td>
+                    `;
+                }
+                
+                tbody.appendChild(row);
+            }
+        }
+        
+        function exportToExcel() {
+            if (!comparisonResults) return;
+            
+            const wb = XLSX.utils.book_new();
+            
+            // Hoja de productos con precio aumentado
+            if (comparisonResults.increased.length > 0) {
+                const increasedData = comparisonResults.increased.map(item => ({
+                    'Producto': item.name,
+                    'Categoría': item.category,
+                    'Precio Anterior': item.oldPrice,
+                    'Precio Nuevo': item.price,
+                    'Diferencia': item.diff,
+                    '% Cambio': item.percentChange + '%'
+                }));
+                const ws1 = XLSX.utils.json_to_sheet(increasedData);
+                XLSX.utils.book_append_sheet(wb, ws1, "Precios Aumentados");
+            }
+            
+            // Hoja de productos con precio reducido
+            if (comparisonResults.decreased.length > 0) {
+                const decreasedData = comparisonResults.decreased.map(item => ({
+                    'Producto': item.name,
+                    'Categoría': item.category,
+                    'Precio Anterior': item.oldPrice,
+                    'Precio Nuevo': item.price,
+                    'Diferencia': item.diff,
+                    '% Cambio': item.percentChange + '%'
+                }));
+                const ws2 = XLSX.utils.json_to_sheet(decreasedData);
+                XLSX.utils.book_append_sheet(wb, ws2, "Precios Reducidos");
+            }
+            
+            // Hoja de productos nuevos
+            if (comparisonResults.newProducts.length > 0) {
+                const newData = comparisonResults.newProducts.map(item => ({
+                    'Producto': item.name,
+                    'Categoría': item.category,
+                    'Precio': item.price
+                }));
+                const ws3 = XLSX.utils.json_to_sheet(newData);
+                XLSX.utils.book_append_sheet(wb, ws3, "Productos Nuevos");
+            }
+            
+            // Descargar el archivo
+            const fecha = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(wb, `Comparacion_Precios_${fecha}.xlsx`);
+        }
+    </script>
+</body>
+</html>

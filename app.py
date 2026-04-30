@@ -1882,6 +1882,9 @@ class StockApp(tk.Tk):
         menu_datos.add_command(label="💰  Reporte de Capital", command=self._abrir_reporte_capital)
         menu_datos.add_separator()
         menu_datos.add_command(label="📦  Crear Copia de Seguridad", command=self._backup_db)
+        menu_datos.add_separator()
+        menu_datos.add_command(label="📊  Comparador de Listas", command=self._abrir_comparador_listas)
+        menu_datos.add_command(label="📝  Documentación", command=self._abrir_documentacion)
         mb_datos.config(menu=menu_datos)
         mb_datos.pack(side="right", padx=6)
         
@@ -2352,6 +2355,33 @@ class StockApp(tk.Tk):
                 messagebox.showinfo("Backup Exitoso", f"Copia de seguridad guardada correctamente en:\n{filepath}", parent=self)
             except Exception as e:
                 messagebox.showerror("Error de Backup", f"No se pudo crear la copia de seguridad:\n{e}", parent=self)
+
+    def _abrir_comparador_listas(self):
+        import webbrowser
+        import sys
+        from pathlib import Path
+        
+        if getattr(sys, 'frozen', False):
+            # Si corre desde el .exe (usamos sys._MEIPASS que es donde PyInstaller extrae los datos temporales)
+            base_dir = Path(sys._MEIPASS)
+        else:
+            base_dir = Path(__file__).parent
+            
+        ruta = base_dir / "comparador_listas.html"
+        
+        if ruta.exists():
+            webbrowser.open(ruta.as_uri())
+        else:
+            # Fallback en caso de que lo abran como .exe pero no esté en MEIPASS sino al lado
+            ruta_alt = Path(sys.executable).parent / "comparador_listas.html"
+            if ruta_alt.exists():
+                webbrowser.open(ruta_alt.as_uri())
+            else:
+                messagebox.showerror("Archivo no encontrado", f"No se encontró el comparador en:\n{ruta}\nni en:\n{ruta_alt}")
+            
+    def _abrir_documentacion(self):
+        import webbrowser
+        webbrowser.open("https://docs.google.com/document/u/0/")
 
     # ── Pestaña Productos ─────────────────────────
 
