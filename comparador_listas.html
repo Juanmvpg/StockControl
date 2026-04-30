@@ -326,7 +326,7 @@
                 <h3>📋 Lista Anterior (Vieja)</h3>
                 <p style="color: #666; margin-bottom: 15px;">Sube el archivo del mes anterior</p>
                 <div class="file-input-wrapper">
-                    <input type="file" id="oldFile" accept=".xlsx,.xls" onchange="handleFileUpload('old')">
+                    <input type="file" id="oldFile" accept=".xlsx,.xls,.csv" onchange="handleFileUpload('old')">
                     <label for="oldFile" class="file-input-label">Seleccionar archivo</label>
                 </div>
                 <div class="file-name" id="oldFileName">Ningún archivo seleccionado</div>
@@ -336,30 +336,11 @@
                 <h3>📋 Lista Nueva (Actual)</h3>
                 <p style="color: #666; margin-bottom: 15px;">Sube el archivo del mes actual</p>
                 <div class="file-input-wrapper">
-                    <input type="file" id="newFile" accept=".xlsx,.xls" onchange="handleFileUpload('new')">
+                    <input type="file" id="newFile" accept=".xlsx,.xls,.csv" onchange="handleFileUpload('new')">
                     <label for="newFile" class="file-input-label">Seleccionar archivo</label>
                 </div>
                 <div class="file-name" id="newFileName">Ningún archivo seleccionado</div>
             </div>
-        </div>
-
-        <div style="text-align: center; margin-bottom: 30px; background: #f8f9ff; padding: 20px; border-radius: 15px; border: 2px solid #e0e5ff;">
-            <h3 style="color: #667eea; margin-bottom: 15px; font-size: 1.1em;">⚙️ Configuración de Columnas Excel</h3>
-            <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
-                <div>
-                    <label style="font-weight: bold; color: #555;">Columna Nombre:</label><br>
-                    <input type="text" id="colName" value="A" style="width: 60px; text-align: center; padding: 8px; border: 1px solid #ccc; border-radius: 5px; margin-top: 5px; font-weight: bold; text-transform: uppercase;">
-                </div>
-                <div>
-                    <label style="font-weight: bold; color: #555;">Columna Precio:</label><br>
-                    <input type="text" id="colPrice" value="B" style="width: 60px; text-align: center; padding: 8px; border: 1px solid #ccc; border-radius: 5px; margin-top: 5px; font-weight: bold; text-transform: uppercase;">
-                </div>
-                <div>
-                    <label style="font-weight: bold; color: #555;">Columna Categoría:</label><br>
-                    <input type="text" id="colCat" value="C" placeholder="(Opc.)" style="width: 60px; text-align: center; padding: 8px; border: 1px solid #ccc; border-radius: 5px; margin-top: 5px; font-weight: bold; text-transform: uppercase;">
-                </div>
-            </div>
-            <p style="color: #888; font-size: 0.85em; margin-top: 15px;">Asegúrate de indicar en qué letra está cada dato antes de comparar.</p>
         </div>
         
         <button class="compare-btn" id="compareBtn" onclick="compareFiles()" disabled>
@@ -462,98 +443,167 @@
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const data = new Uint8Array(e.target.result);
-                    try {
-                        const workbook = XLSX.read(data, {type: 'array'});
-                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                        const jsonData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
-                        
-                        if (type === 'old') {
-                            oldData = jsonData; // Guardamos el crudo, se parseará al comparar
-                        } else {
-                            newData = jsonData; // Guardamos el crudo, se parseará al comparar
-                        }
-                        checkReadyToCompare();
-                    } catch (err) {
-                        alert("Error al leer el archivo Excel. Asegúrate de que no esté dañado.");
-                        console.error(err);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+                    
+                    if (type === 'old') {
+                        oldData = parseData(jsonData);
+                    } else {
+                        newData = parseData(jsonData);
                     }
+                    
+                    checkReadyToCompare();
                 };
                 reader.readAsArrayBuffer(file);
             }
         }
         
-        function letterToIndex(letter) {
-            if (!letter) return -1;
-            letter = letter.toUpperCase().trim();
-            if (!letter.match(/^[A-Z]+$/)) return -1;
-            let idx = 0;
-            for (let i = 0; i < letter.length; i++) {
-                idx = idx * 26 + (letter.charCodeAt(i) - 64);
-            }
-            return idx - 1;
-        }
-        
         function parseData(rawData) {
             const products = {};
             
-            // Función robusta para parsear precios que pueden venir como "1.500,50", "$1,500.50", "1500", etc.
-            function parsePrice(val) {
-                if (val === null || val === undefined || val === '') return NaN;
-                if (typeof val === 'number') return val;
-                
-                let s = String(val).replace('$', '').trim();
-                
-                // Si tiene comas y puntos
-                if (s.includes(',') && s.includes('.')) {
-                    let lastComma = s.lastIndexOf(',');
-                    let lastDot = s.lastIndexOf('.');
-                    if (lastComma > lastDot) {
-                        // Coma es decimal (ej. 1.500,00)
-                        s = s.replace(/\./g, '').replace(',', '.');
-                    } else {
-                        // Punto es decimal (ej. 1,500.00)
-                        s = s.replace(/,/g, '');
+            // Detectar formato del archivo
+            const format = detectFormat(rawData);
+            console.log('Formato detectado:', format);
+            
+            if (format === 'formato1') {
+                // Formato con encabezados (ej: AGOSTO 2025)
+                // Buscar fila de encabezado
+                let headerRow = 0;
+                for (let i = 0; i < rawData.length && i < 10; i++) {
+                    const row = rawData[i];
+                    if (row && row.length > 0) {
+                        const firstCell = row[0] ? row[0].toString().toLowerCase() : '';
+                        if (firstCell.includes('descripción') || firstCell.includes('producto')) {
+                            headerRow = i;
+                            break;
+                        }
                     }
-                } else if (s.includes(',')) {
-                    // Solo coma (ej. 1500,50)
-                    s = s.replace(',', '.');
                 }
                 
-                return parseFloat(s);
-            }
-            
-            const nameIdx = letterToIndex(document.getElementById('colName').value);
-            const priceIdx = letterToIndex(document.getElementById('colPrice').value);
-            const catIdx = letterToIndex(document.getElementById('colCat').value);
-            
-            if (nameIdx === -1 || priceIdx === -1) {
-                alert("Por favor, configura correctamente las letras de las columnas de Nombre y Precio.");
-                return null;
-            }
-
-            for (let row of rawData) {
-                if (!row || !row.length) continue;
+                const headers = rawData[headerRow];
+                let productCol = -1, priceCol = -1, categoryCol = -1;
                 
-                let rawName = row[nameIdx];
-                if (!rawName || String(rawName).trim() === '') continue;
+                // Detectar columnas
+                for (let i = 0; i < headers.length; i++) {
+                    const header = headers[i] ? headers[i].toString().toLowerCase() : '';
+                    if (header.includes('descripción') || header.includes('producto')) productCol = i;
+                    if (header.includes('precio')) priceCol = i;
+                    if (header.includes('fabricante') || header.includes('categoría') || header.includes('marca')) categoryCol = i;
+                }
                 
-                const productName = String(rawName).trim();
-                const price = parsePrice(row[priceIdx]);
-                const category = catIdx >= 0 && row[catIdx] ? String(row[catIdx]).trim() : 'Sin categoría';
+                // Procesar datos
+                for (let i = headerRow + 1; i < rawData.length; i++) {
+                    const row = rawData[i];
+                    if (!row || !row[productCol]) continue;
+                    
+                    const productName = row[productCol].toString().trim();
+                    const price = parseFloat(row[priceCol]);
+                    const category = row[categoryCol] ? row[categoryCol].toString().trim() : 'Sin categoría';
+                    
+                    if (!isNaN(price) && price > 0 && productName) {
+                        products[productName] = {
+                            name: productName,
+                            price: price,
+                            category: category
+                        };
+                    }
+                }
+            } else {
+                // Formato sin encabezados claros (ej: JULIO 2025, 2026)
+                // Primero detectar en qué columna está el precio
+                let priceCol = -1;
+                let startRow = 0;
                 
-                // Ignorar filas que parezcan encabezados (donde el precio no es un número válido)
-                if (!isNaN(price) && price > 0) {
-                    // Normalize el nombre para la clave del diccionario (minúsculas, sin espacios extra)
-                    const key = productName.toLowerCase().replace(/\s+/g, ' ');
-                    products[key] = {
-                        name: productName, // guardar el nombre original para mostrar
-                        price: price,
-                        category: category
-                    };
+                for (let i = 0; i < rawData.length && i < 20; i++) {
+                    const row = rawData[i];
+                    if (!row || !row[0]) continue;
+                    
+                    const firstCell = row[0] ? row[0].toString().toLowerCase() : '';
+                    
+                    // Ignorar filas de encabezado/texto
+                    if (firstCell.includes('precio') || firstCell.includes('lista') || 
+                        firstCell.includes('compras') || firstCell.includes('producto') ||
+                        firstCell.includes('distribuidora') || firstCell.includes('consulta')) {
+                        continue;
+                    }
+                    
+                    // Buscar columna con precio válido
+                    for (let col = 1; col < Math.min(row.length, 5); col++) {
+                        const price = parseFloat(row[col]);
+                        if (!isNaN(price) && price > 0) {
+                            priceCol = col;
+                            startRow = i;
+                            break;
+                        }
+                    }
+                    
+                    if (priceCol !== -1) break;
+                }
+                
+                console.log('Columna de precio detectada:', priceCol, 'Fila de inicio:', startRow);
+                
+                // Si no se detectó columna de precio, usar columna 1 por defecto
+                if (priceCol === -1) {
+                    priceCol = 1;
+                    startRow = 0;
+                }
+                
+                // Procesar datos desde la fila de inicio
+                for (let i = startRow; i < rawData.length; i++) {
+                    const row = rawData[i];
+                    if (!row || !row[0]) continue;
+                    
+                    const productName = row[0].toString().trim();
+                    
+                    // Ignorar filas que parecen encabezados o texto
+                    if (productName.toLowerCase().includes('lista') || 
+                        productName.toLowerCase().includes('precio') ||
+                        productName.toLowerCase().includes('compra') ||
+                        productName.toLowerCase().includes('consulta') ||
+                        productName.toLowerCase().includes('distribuidora') ||
+                        productName === '') continue;
+                    
+                    const price = parseFloat(row[priceCol]);
+                    
+                    // Detectar columna de categoría (buscar en las columnas restantes)
+                    let category = 'Sin categoría';
+                    for (let col = 1; col < row.length; col++) {
+                        if (col !== priceCol && row[col] && typeof row[col] === 'string' && row[col].trim() !== '') {
+                            category = row[col].toString().trim();
+                            break;
+                        }
+                    }
+                    
+                    // Solo agregar si tiene precio válido
+                    if (!isNaN(price) && price > 0) {
+                        products[productName] = {
+                            name: productName,
+                            price: price,
+                            category: category
+                        };
+                    }
                 }
             }
             
             return products;
+        }
+        
+        function detectFormat(rawData) {
+            // Revisar las primeras filas para detectar el formato
+            for (let i = 0; i < Math.min(10, rawData.length); i++) {
+                const row = rawData[i];
+                if (row && row.length > 0 && row[0]) {
+                    const firstCell = row[0].toString().toLowerCase();
+                    // Si encontramos headers claros como "Descripción del producto", es formato1
+                    if (firstCell.includes('descripción del producto') || 
+                        (firstCell.includes('descripción') && firstCell.includes('producto'))) {
+                        return 'formato1';
+                    }
+                }
+            }
+            // Por defecto, asumir formato2 (sin headers claros)
+            return 'formato2';
         }
         
         function checkReadyToCompare() {
@@ -564,11 +614,6 @@
         }
         
         function compareFiles() {
-            const parsedOldData = parseData(oldData);
-            const parsedNewData = parseData(newData);
-            
-            if (!parsedOldData || !parsedNewData) return;
-            
             document.getElementById('loading').classList.add('show');
             document.getElementById('results').classList.remove('show');
             
@@ -578,9 +623,9 @@
                 const newProducts = [];
                 
                 // Buscar cambios de precio
-                for (let key in parsedNewData) {
-                    const newProduct = parsedNewData[key];
-                    const oldProduct = parsedOldData[key];
+                for (let productName in newData) {
+                    const newProduct = newData[productName];
+                    const oldProduct = oldData[productName];
                     
                     if (oldProduct) {
                         const priceDiff = newProduct.price - oldProduct.price;
