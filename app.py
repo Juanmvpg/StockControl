@@ -1367,6 +1367,173 @@ class ImportacionResumenDialog(tk.Toplevel):
         btn_frame.pack(side="bottom", fill="x")
         styled_btn(btn_frame, "Aceptar", self.destroy, color=BG3).pack()
 
+class ReporteCapitalDialog(tk.Toplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("Reporte de Capital Total")
+        self.geometry("900x600")
+        self.minsize(700, 500)
+        self.configure(bg=BG)
+        self.grab_set()
+        
+        self.productos = db.get_productos()
+        
+        self.categorias = sorted(list({p.get("categoria") or "Sin Categoría" for p in self.productos}))
+        self.marcas = sorted(list({p.get("marca") or "Sin Marca" for p in self.productos}))
+        
+        self.excluidos_ids = set()
+        
+        self._build_ui()
+        self._calcular()
+        
+    def _build_ui(self):
+        # Header
+        header = tk.Frame(self, bg=BG2, pady=20)
+        header.pack(fill="x")
+        tk.Label(header, text="💰 Capital Total (Stock × Precio)", bg=BG2, fg=TEXT_DIM, font=("Segoe UI", 12)).pack()
+        self.lbl_total = tk.Label(header, text="$ 0.00", bg=BG2, fg=SUCCESS, font=("Segoe UI", 28, "bold"))
+        self.lbl_total.pack()
+        
+        # Body
+        body = tk.Frame(self, bg=BG)
+        body.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Col 1: Categorías
+        col_cat = tk.Frame(body, bg=BG)
+        col_cat.pack(side="left", fill="y", expand=True, padx=10)
+        tk.Label(col_cat, text="Categorías a Incluir", bg=BG, fg=TEXT, font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        tk.Button(col_cat, text="Todas / Ninguna", command=self._toggle_cat, bg=BG3, fg=TEXT, relief="flat", font=("Segoe UI", 8), cursor="hand2").pack(anchor="w", pady=2)
+        
+        cat_frame = tk.Frame(col_cat, bg=BG2)
+        cat_frame.pack(fill="y", expand=True)
+        self.lb_cat = tk.Listbox(cat_frame, selectmode="multiple", bg=BG2, fg=TEXT, font=("Segoe UI", 10), relief="flat", selectbackground=ACCENT)
+        self.lb_cat.pack(side="left", fill="both", expand=True)
+        for c in self.categorias:
+            self.lb_cat.insert("end", c)
+            self.lb_cat.selection_set("end")
+        self.lb_cat.bind("<<ListboxSelect>>", lambda e: self._calcular())
+        
+        # Col 2: Marcas
+        col_marca = tk.Frame(body, bg=BG)
+        col_marca.pack(side="left", fill="y", expand=True, padx=10)
+        tk.Label(col_marca, text="Marcas a Incluir", bg=BG, fg=TEXT, font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        tk.Button(col_marca, text="Todas / Ninguna", command=self._toggle_marca, bg=BG3, fg=TEXT, relief="flat", font=("Segoe UI", 8), cursor="hand2").pack(anchor="w", pady=2)
+        
+        marca_frame = tk.Frame(col_marca, bg=BG2)
+        marca_frame.pack(fill="y", expand=True)
+        self.lb_marca = tk.Listbox(marca_frame, selectmode="multiple", bg=BG2, fg=TEXT, font=("Segoe UI", 10), relief="flat", selectbackground=ACCENT)
+        self.lb_marca.pack(side="left", fill="both", expand=True)
+        for m in self.marcas:
+            self.lb_marca.insert("end", m)
+            self.lb_marca.selection_set("end")
+        self.lb_marca.bind("<<ListboxSelect>>", lambda e: self._calcular())
+
+        # Col 3: Excluidos
+        col_prod = tk.Frame(body, bg=BG)
+        col_prod.pack(side="left", fill="both", expand=True, padx=10)
+        
+        tk.Label(col_prod, text="Productos Individuales a Excluir", bg=BG, fg=TEXT, font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        tk.Label(col_prod, text="(Escribe para buscar. Doble clic para excluir)", bg=BG, fg=TEXT_DIM, font=("Segoe UI", 8)).pack(anchor="w")
+        
+        search_f = tk.Frame(col_prod, bg=BG)
+        search_f.pack(fill="x", pady=5)
+        self.v_buscar = tk.StringVar()
+        entry_search = tk.Entry(search_f, textvariable=self.v_buscar, font=("Segoe UI", 10), bg=BG2, fg=TEXT, insertbackground=TEXT)
+        entry_search.pack(side="left", fill="x", expand=True)
+        self.v_buscar.trace_add("write", self._on_search)
+        
+        self.lb_search = tk.Listbox(col_prod, height=6, bg=BG2, fg=TEXT, font=("Segoe UI", 9), relief="flat", selectbackground=WARNING)
+        self.lb_search.pack(fill="x")
+        self.lb_search.bind("<Double-Button-1>", self._add_excluded_prod)
+        
+        tk.Label(col_prod, text="Lista de Excluidos (Doble clic para quitar):", bg=BG, fg=TEXT_DIM, font=("Segoe UI", 9)).pack(anchor="w", pady=(10,0))
+        self.lb_excluidos = tk.Listbox(col_prod, bg=BG2, fg=DANGER, font=("Segoe UI", 10), relief="flat", selectbackground=BG3)
+        self.lb_excluidos.pack(fill="both", expand=True)
+        self.lb_excluidos.bind("<Double-Button-1>", self._remove_excluded_prod)
+        
+        # Bottom
+        foot = tk.Frame(self, bg=BG, pady=10)
+        foot.pack(side="bottom", fill="x")
+        styled_btn(foot, "Cerrar Panel", self.destroy, color=BG3).pack()
+
+        self._on_search()
+
+    def _toggle_cat(self):
+        if len(self.lb_cat.curselection()) > 0:
+            self.lb_cat.selection_clear(0, "end")
+        else:
+            self.lb_cat.selection_set(0, "end")
+        self._calcular()
+
+    def _toggle_marca(self):
+        if len(self.lb_marca.curselection()) > 0:
+            self.lb_marca.selection_clear(0, "end")
+        else:
+            self.lb_marca.selection_set(0, "end")
+        self._calcular()
+        
+    def _on_search(self, *args):
+        q = self.v_buscar.get().strip().lower()
+        self.lb_search.delete(0, "end")
+        self._search_map = []
+        if len(q) < 2:
+            return
+        
+        count = 0
+        for p in self.productos:
+            if p["id"] in self.excluidos_ids: continue
+            if q in p["nombre"].lower() or q in str(p.get("codigo", "")).lower():
+                self.lb_search.insert("end", f"{p['nombre']} (Stock: {p['stock']})")
+                self._search_map.append(p)
+                count += 1
+                if count >= 10: break
+
+    def _add_excluded_prod(self, event):
+        sel = self.lb_search.curselection()
+        if not sel: return
+        p = self._search_map[sel[0]]
+        self.excluidos_ids.add(p["id"])
+        self.lb_excluidos.insert("end", p["nombre"])
+        self._on_search()
+        self._calcular()
+
+    def _remove_excluded_prod(self, event):
+        sel = self.lb_excluidos.curselection()
+        if not sel: return
+        idx = sel[0]
+        nombre = self.lb_excluidos.get(idx)
+        self.lb_excluidos.delete(idx)
+        for p in self.productos:
+            if p["nombre"] == nombre and p["id"] in self.excluidos_ids:
+                self.excluidos_ids.remove(p["id"])
+                break
+        self._on_search()
+        self._calcular()
+
+    def _calcular(self):
+        sel_cat_idx = self.lb_cat.curselection()
+        sel_cats = {self.categorias[i] for i in sel_cat_idx}
+        
+        sel_marca_idx = self.lb_marca.curselection()
+        sel_marcas = {self.marcas[i] for i in sel_marca_idx}
+        
+        total = 0.0
+        for p in self.productos:
+            if p["id"] in self.excluidos_ids: continue
+            
+            c = p.get("categoria") or "Sin Categoría"
+            m = p.get("marca") or "Sin Marca"
+            
+            if c not in sel_cats: continue
+            if m not in sel_marcas: continue
+            
+            stock = float(p["stock"] or 0)
+            precio = float(p["precio"] or 0)
+            if stock > 0 and precio > 0:
+                total += stock * precio
+                
+        self.lbl_total.config(text=f"$ {total:,.2f}")
+
 # ──────────────────────────────────────────────
 #  Ventana de Importación (Asistente de Mapeo)
 # ──────────────────────────────────────────────
@@ -1688,6 +1855,8 @@ class StockApp(tk.Tk):
                              font=("Segoe UI", 9))
         menu_datos.add_command(label="⬇  Exportar CSV", command=self._exportar_csv)
         menu_datos.add_command(label="⬆  Importar archivo", command=self._importar_datos)
+        menu_datos.add_separator()
+        menu_datos.add_command(label="💰  Reporte de Capital", command=self._abrir_reporte_capital)
         menu_datos.add_separator()
         menu_datos.add_command(label="📦  Crear Copia de Seguridad", command=self._backup_db)
         mb_datos.config(menu=menu_datos)
@@ -3440,6 +3609,9 @@ class StockApp(tk.Tk):
                 self._cantidades_carrito.clear()
             self.refresh_productos()
 
+    def _abrir_reporte_capital(self):
+        ReporteCapitalDialog(self)
+        
     def _exportar_csv(self):
         filepath = filedialog.asksaveasfilename(
             defaultextension=".csv",
