@@ -445,6 +445,7 @@
                 
                 if (ext === 'csv') {
                     Papa.parse(file, {
+                        skipEmptyLines: true,
                         complete: function(results) {
                             const jsonData = results.data;
                             if (type === 'old') {
@@ -482,19 +483,52 @@
         function parseData(rawData) {
             const products = {};
             
-            for (let row of rawData) {
-                // Ignorar filas vacías
-                if (!row[0] || row[0].trim() === '') continue;
+            // Función robusta para parsear precios que pueden venir como "1.500,50", "$1,500.50", "1500", etc.
+            function parsePrice(val) {
+                if (val === null || val === undefined || val === '') return NaN;
+                if (typeof val === 'number') return val;
                 
-                const productName = String(row[0]).trim();
-                let priceStr = String(row[1] || "").replace('$', '').replace(',', '.').trim();
-                const price = parseFloat(priceStr);
+                let s = String(val).replace('$', '').trim();
+                
+                // Si tiene comas y puntos
+                if (s.includes(',') && s.includes('.')) {
+                    let lastComma = s.lastIndexOf(',');
+                    let lastDot = s.lastIndexOf('.');
+                    if (lastComma > lastDot) {
+                        // Coma es decimal (ej. 1.500,00)
+                        s = s.replace(/\./g, '').replace(',', '.');
+                    } else {
+                        // Punto es decimal (ej. 1,500.00)
+                        s = s.replace(/,/g, '');
+                    }
+                } else if (s.includes(',')) {
+                    // Solo coma (ej. 1500,50)
+                    s = s.replace(',', '.');
+                }
+                
+                return parseFloat(s);
+            }
+            
+            for (let row of rawData) {
+                if (!row || !row.length) continue;
+                
+                // Tratar de buscar las columnas de Nombre y Precio
+                // Si el usuario carga un CSV donde la primera col no es el nombre, esto fallará,
+                // pero asumiremos el formato estándar por defecto: Col 0: Nombre, Col 1: Precio, Col 2: Cat.
+                
+                let rawName = row[0];
+                if (!rawName || String(rawName).trim() === '') continue;
+                
+                const productName = String(rawName).trim();
+                const price = parsePrice(row[1]);
                 const category = row[2] ? String(row[2]).trim() : 'Sin categoría';
                 
-                // Solo agregar si tiene precio válido
+                // Ignorar filas que parezcan encabezados (donde el precio no es un número válido)
                 if (!isNaN(price) && price > 0) {
-                    products[productName] = {
-                        name: productName,
+                    // Normalize el nombre para la clave del diccionario (minúsculas, sin espacios extra)
+                    const key = productName.toLowerCase().replace(/\s+/g, ' ');
+                    products[key] = {
+                        name: productName, // guardar el nombre original para mostrar
                         price: price,
                         category: category
                     };
@@ -521,9 +555,9 @@
                 const newProducts = [];
                 
                 // Buscar cambios de precio
-                for (let productName in newData) {
-                    const newProduct = newData[productName];
-                    const oldProduct = oldData[productName];
+                for (let key in newData) {
+                    const newProduct = newData[key];
+                    const oldProduct = oldData[key];
                     
                     if (oldProduct) {
                         const priceDiff = newProduct.price - oldProduct.price;
