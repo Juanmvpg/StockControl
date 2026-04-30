@@ -2169,6 +2169,9 @@ class StockApp(tk.Tk):
                     self.tree_ed.see(siguiente)
                     self.tree_ed.selection_set(siguiente)
                     self._montar_entry_stock(siguiente)
+                else:
+                    self.tree_ed.focus_force()
+                    self.tree_ed.selection_set(iid)
                     
             return "break"
 
@@ -3446,6 +3449,9 @@ class StockApp(tk.Tk):
             if marca_filtrada != "Todas" and marca_filtrada != "Sin marca" and m != marca_filtrada: continue
 
             stock_val = p.get("stock", 0)
+            if getattr(self, '_modo_stock_rapido', False) and p["id"] in getattr(self, '_cambios_stock_tmp', {}):
+                stock_val = self._cambios_stock_tmp[p["id"]]
+                
             try:
                 stock_num = float(stock_val)
             except (TypeError, ValueError):
