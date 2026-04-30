@@ -1406,7 +1406,7 @@ class ReporteCapitalDialog(tk.Toplevel):
         
         cat_frame = tk.Frame(col_cat, bg=BG2)
         cat_frame.pack(fill="both", expand=True)
-        self.lb_cat = tk.Listbox(cat_frame, selectmode="multiple", bg=BG2, fg=TEXT, font=("Segoe UI", 10), relief="flat", selectbackground=ACCENT)
+        self.lb_cat = tk.Listbox(cat_frame, selectmode="multiple", bg=BG2, fg=TEXT, font=("Segoe UI", 10), relief="flat", selectbackground=ACCENT, exportselection=False)
         self.lb_cat.pack(side="left", fill="both", expand=True)
         for c in self.categorias:
             self.lb_cat.insert("end", c)
@@ -1421,7 +1421,7 @@ class ReporteCapitalDialog(tk.Toplevel):
         
         marca_frame = tk.Frame(col_marca, bg=BG2)
         marca_frame.pack(fill="both", expand=True)
-        self.lb_marca = tk.Listbox(marca_frame, selectmode="multiple", bg=BG2, fg=TEXT, font=("Segoe UI", 10), relief="flat", selectbackground=ACCENT)
+        self.lb_marca = tk.Listbox(marca_frame, selectmode="multiple", bg=BG2, fg=TEXT, font=("Segoe UI", 10), relief="flat", selectbackground=ACCENT, exportselection=False)
         self.lb_marca.pack(side="left", fill="both", expand=True)
         for m in self.marcas:
             self.lb_marca.insert("end", m)
@@ -1442,12 +1442,12 @@ class ReporteCapitalDialog(tk.Toplevel):
         entry_search.pack(side="left", fill="x", expand=True)
         self.v_buscar.trace_add("write", self._on_search)
         
-        self.lb_search = tk.Listbox(col_prod, height=6, bg=BG2, fg=TEXT, font=("Segoe UI", 9), relief="flat", selectbackground=WARNING)
+        self.lb_search = tk.Listbox(col_prod, height=6, bg=BG2, fg=TEXT, font=("Segoe UI", 9), relief="flat", selectbackground=WARNING, exportselection=False)
         self.lb_search.pack(fill="x")
         self.lb_search.bind("<Double-Button-1>", self._add_excluded_prod)
         
         tk.Label(col_prod, text="Lista de Excluidos (Doble clic para quitar):", bg=BG, fg=TEXT_DIM, font=("Segoe UI", 9)).pack(anchor="w", pady=(10,0))
-        self.lb_excluidos = tk.Listbox(col_prod, bg=BG2, fg=DANGER, font=("Segoe UI", 10), relief="flat", selectbackground=BG3)
+        self.lb_excluidos = tk.Listbox(col_prod, bg=BG2, fg=DANGER, font=("Segoe UI", 10), relief="flat", selectbackground=BG3, exportselection=False)
         self.lb_excluidos.pack(fill="both", expand=True)
         self.lb_excluidos.bind("<Double-Button-1>", self._remove_excluded_prod)
         
