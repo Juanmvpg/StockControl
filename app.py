@@ -2084,7 +2084,7 @@ class StockApp(tk.Tk):
         
         self._montar_entry_stock(iid)
 
-    def _montar_entry_stock(self, iid):
+    def _montar_entry_stock(self, iid, delay=True):
         # Evitar doble edición en la misma o diferente si no ha cerrado
         if hasattr(self, '_stock_entry_active') and self._stock_entry_active:
             try:
@@ -2092,8 +2092,12 @@ class StockApp(tk.Tk):
             except Exception: pass
             self._stock_entry_active = None
 
-        # Diferir la creación del Entry para que el Treeview termine de procesar el click
-        self.after(30, lambda: self._crear_entry_stock(iid))
+        if delay:
+            # Diferir la creación del Entry para que el Treeview termine de procesar el click
+            self.after(30, lambda: self._crear_entry_stock(iid))
+        else:
+            self.tree_ed.update_idletasks()
+            self._crear_entry_stock(iid)
 
     def _crear_entry_stock(self, iid):
         val_actual = self.tree_ed.set(iid, "stock")
@@ -2168,7 +2172,7 @@ class StockApp(tk.Tk):
                 if siguiente:
                     self.tree_ed.see(siguiente)
                     self.tree_ed.selection_set(siguiente)
-                    self._montar_entry_stock(siguiente)
+                    self._montar_entry_stock(siguiente, delay=False)
                 else:
                     self.tree_ed.focus_force()
                     self.tree_ed.selection_set(iid)
