@@ -1,0 +1,23 @@
+# Base de datos local (NO subir al repositorio para no perder datos ni compartir información privada)
+stock.db
+stock_backup_*.db
+*.db
+
+# Carpetas de compilación de PyInstaller
+build/
+dist/
+*.spec
+
+# Caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales (si llegas a usar uno)
+venv/
+env/
+.env
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
