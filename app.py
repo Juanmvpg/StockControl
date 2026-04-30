@@ -1884,7 +1884,7 @@ class StockApp(tk.Tk):
         menu_datos.add_command(label="📦  Crear Copia de Seguridad", command=self._backup_db)
         menu_datos.add_separator()
         menu_datos.add_command(label="📊  Comparador de Listas", command=self._abrir_comparador_listas)
-        menu_datos.add_command(label="📝  Documentación", command=self._abrir_documentacion)
+        menu_datos.add_command(label="📝  Hoja de Cálculo", command=self._abrir_hoja_calculo)
         mb_datos.config(menu=menu_datos)
         mb_datos.pack(side="right", padx=6)
         
@@ -2379,9 +2379,9 @@ class StockApp(tk.Tk):
             else:
                 messagebox.showerror("Archivo no encontrado", f"No se encontró el comparador en:\n{ruta}\nni en:\n{ruta_alt}")
             
-    def _abrir_documentacion(self):
+    def _abrir_hoja_calculo(self):
         import webbrowser
-        webbrowser.open("https://docs.google.com/document/u/0/")
+        webbrowser.open("https://docs.google.com/spreadsheets/u/0/")
 
     # ── Pestaña Productos ─────────────────────────
 
