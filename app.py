@@ -1400,12 +1400,12 @@ class ReporteCapitalDialog(tk.Toplevel):
         
         # Col 1: Categorías
         col_cat = tk.Frame(body, bg=BG)
-        col_cat.pack(side="left", fill="y", expand=True, padx=10)
+        col_cat.pack(side="left", fill="both", expand=True, padx=10)
         tk.Label(col_cat, text="Categorías a Incluir", bg=BG, fg=TEXT, font=("Segoe UI", 10, "bold")).pack(anchor="w")
         tk.Button(col_cat, text="Todas / Ninguna", command=self._toggle_cat, bg=BG3, fg=TEXT, relief="flat", font=("Segoe UI", 8), cursor="hand2").pack(anchor="w", pady=2)
         
         cat_frame = tk.Frame(col_cat, bg=BG2)
-        cat_frame.pack(fill="y", expand=True)
+        cat_frame.pack(fill="both", expand=True)
         self.lb_cat = tk.Listbox(cat_frame, selectmode="multiple", bg=BG2, fg=TEXT, font=("Segoe UI", 10), relief="flat", selectbackground=ACCENT)
         self.lb_cat.pack(side="left", fill="both", expand=True)
         for c in self.categorias:
@@ -1415,12 +1415,12 @@ class ReporteCapitalDialog(tk.Toplevel):
         
         # Col 2: Marcas
         col_marca = tk.Frame(body, bg=BG)
-        col_marca.pack(side="left", fill="y", expand=True, padx=10)
+        col_marca.pack(side="left", fill="both", expand=True, padx=10)
         tk.Label(col_marca, text="Marcas a Incluir", bg=BG, fg=TEXT, font=("Segoe UI", 10, "bold")).pack(anchor="w")
         tk.Button(col_marca, text="Todas / Ninguna", command=self._toggle_marca, bg=BG3, fg=TEXT, relief="flat", font=("Segoe UI", 8), cursor="hand2").pack(anchor="w", pady=2)
         
         marca_frame = tk.Frame(col_marca, bg=BG2)
-        marca_frame.pack(fill="y", expand=True)
+        marca_frame.pack(fill="both", expand=True)
         self.lb_marca = tk.Listbox(marca_frame, selectmode="multiple", bg=BG2, fg=TEXT, font=("Segoe UI", 10), relief="flat", selectbackground=ACCENT)
         self.lb_marca.pack(side="left", fill="both", expand=True)
         for m in self.marcas:
