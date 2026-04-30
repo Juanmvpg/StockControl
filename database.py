@@ -75,6 +75,8 @@ def init_db():
             conn.execute("ALTER TABLE productos ADD COLUMN nota TEXT DEFAULT ''")
         if "activo" not in cols_prod:
             conn.execute("ALTER TABLE productos ADD COLUMN activo INTEGER DEFAULT 1")
+        if "precio_costo" not in cols_prod:
+            conn.execute("ALTER TABLE productos ADD COLUMN precio_costo REAL DEFAULT 0.0")
 
 
 # ──────────────────────────────────────────────
@@ -101,16 +103,16 @@ def get_producto_by_id(pid):
     return dict(row) if row else None
 
 
-def crear_producto(codigo, nombre, categoria, marca, stock, minimo, precio, por_peso=0):
+def crear_producto(codigo, nombre, categoria, marca, stock, minimo, precio, por_peso=0, precio_costo=0.0):
     with get_connection() as conn:
         conn.execute(
-            "INSERT INTO productos (codigo,nombre,categoria,marca,stock,minimo,precio,por_peso) VALUES (?,?,?,?,?,?,?,?)",
-            (codigo, nombre, categoria, marca, stock, minimo, precio, por_peso)
+            "INSERT INTO productos (codigo,nombre,categoria,marca,stock,minimo,precio,por_peso,precio_costo) VALUES (?,?,?,?,?,?,?,?,?)",
+            (codigo, nombre, categoria, marca, stock, minimo, precio, por_peso, precio_costo)
         )
 
 
 
-def upsert_producto(codigo, nombre, categoria, marca, stock, minimo, precio, por_peso=0):
+def upsert_producto(codigo, nombre, categoria, marca, stock, minimo, precio, por_peso=0, precio_costo=0.0):
     """
     Si el código existe (o si código está vacío y el nombre existe), 
     actualiza sus datos (excepto el stock, a menos que se quiera sobreescribir).
@@ -143,6 +145,8 @@ def upsert_producto(codigo, nombre, categoria, marca, stock, minimo, precio, por
                 cambios.append(f"Mínimo: {row['minimo']} -> {minimo}")
             if float(row["precio"] or 0) != float(precio): 
                 cambios.append(f"Precio: {row['precio']} -> {precio}")
+            if float(row["precio_costo"] or 0) != float(precio_costo):
+                cambios.append(f"Costo: {row['precio_costo']} -> {precio_costo}")
             if int(row["por_peso"] or 0) != int(por_peso): 
                 cambios.append(f"Por peso: {'Sí' if por_peso else 'No'}")
             
@@ -152,13 +156,13 @@ def upsert_producto(codigo, nombre, categoria, marca, stock, minimo, precio, por
             if codigo and row["codigo"] != codigo:
                 cambios.insert(0, f"Código: {row['codigo']} -> {codigo}")
                 conn.execute(
-                    "UPDATE productos SET codigo=?, nombre=?, categoria=?, marca=?, minimo=?, precio=?, por_peso=?, activo=1 WHERE id=?",
-                    (codigo, nombre, categoria, marca, minimo, precio, por_peso, row["id"])
+                    "UPDATE productos SET codigo=?, nombre=?, categoria=?, marca=?, minimo=?, precio=?, precio_costo=?, por_peso=?, activo=1 WHERE id=?",
+                    (codigo, nombre, categoria, marca, minimo, precio, precio_costo, por_peso, row["id"])
                 )
             else:
                 conn.execute(
-                    "UPDATE productos SET nombre=?, categoria=?, marca=?, minimo=?, precio=?, por_peso=?, activo=1 WHERE id=?",
-                    (nombre, categoria, marca, minimo, precio, por_peso, row["id"])
+                    "UPDATE productos SET nombre=?, categoria=?, marca=?, minimo=?, precio=?, precio_costo=?, por_peso=?, activo=1 WHERE id=?",
+                    (nombre, categoria, marca, minimo, precio, precio_costo, por_peso, row["id"])
                 )
             return False, cambios  # (fue un update, lista_de_cambios)
         else:
@@ -170,18 +174,18 @@ def upsert_producto(codigo, nombre, categoria, marca, stock, minimo, precio, por
                 
             # Insertamos todo
             conn.execute(
-                "INSERT INTO productos (codigo,nombre,categoria,marca,stock,minimo,precio,por_peso) VALUES (?,?,?,?,?,?,?,?)",
-                (codigo, nombre, categoria, marca, stock, minimo, precio, por_peso)
+                "INSERT INTO productos (codigo,nombre,categoria,marca,stock,minimo,precio,precio_costo,por_peso) VALUES (?,?,?,?,?,?,?,?,?)",
+                (codigo, nombre, categoria, marca, stock, minimo, precio, precio_costo, por_peso)
             )
             return True, []   # (fue un insert, sin_cambios)
 
 
 
-def actualizar_producto(pid, codigo, nombre, categoria, marca, stock, minimo, precio, por_peso=0):
+def actualizar_producto(pid, codigo, nombre, categoria, marca, stock, minimo, precio, por_peso=0, precio_costo=0.0):
     with get_connection() as conn:
         conn.execute(
-            "UPDATE productos SET codigo=?,nombre=?,categoria=?,marca=?,stock=?,minimo=?,precio=?,por_peso=? WHERE id=?",
-            (codigo, nombre, categoria, marca, stock, minimo, precio, por_peso, pid)
+            "UPDATE productos SET codigo=?,nombre=?,categoria=?,marca=?,stock=?,minimo=?,precio=?,precio_costo=?,por_peso=? WHERE id=?",
+            (codigo, nombre, categoria, marca, stock, minimo, precio, precio_costo, por_peso, pid)
         )
 
 def actualizar_productos_masivo(ids, campos_actualizar):

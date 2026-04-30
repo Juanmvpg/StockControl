@@ -85,6 +85,7 @@ class ProductoDialog(tk.Toplevel):
         self.v_stock     = tk.StringVar(value=fmt_qty(producto["stock"], producto.get("por_peso")).replace(" Kg", "")   if producto else "0")
         self.v_minimo    = tk.StringVar(value=fmt_qty(producto["minimo"], producto.get("por_peso")).replace(" Kg", "")  if producto else "0")
         self.v_precio    = tk.StringVar(value=str(producto["precio"])  if producto else "0.0")
+        self.v_precio_costo = tk.StringVar(value=str(producto.get("precio_costo", 0.0)) if producto else "0.0")
         self.v_por_peso  = tk.BooleanVar(value=bool(producto.get("por_peso", 0)) if producto else False)
 
         frame = tk.Frame(self, bg=BG2, padx=24, pady=20)
@@ -97,7 +98,8 @@ class ProductoDialog(tk.Toplevel):
             ("Marca",       self.v_marca),
             ("Stock inicial", self.v_stock),
             ("Stock mínimo",  self.v_minimo),
-            ("Precio",        self.v_precio),
+            ("Precio Costo",  self.v_precio_costo),
+            ("Precio Venta",  self.v_precio),
         ]
 
         self.lbl_stock = None
@@ -112,7 +114,8 @@ class ProductoDialog(tk.Toplevel):
             lbl.grid(row=i, column=0, sticky="w", pady=5, padx=(0,12))
             
             if "Stock inicial" in label_txt: self.lbl_stock = lbl
-            if "Precio" in label_txt: self.lbl_precio = lbl
+            if "Precio Venta" in label_txt: self.lbl_precio = lbl
+            if "Precio Costo" in label_txt: self.lbl_costo = lbl
             
             if label_txt == "Categoría":
                 self.cmb_cat.grid(row=i, column=1, sticky="ew", pady=5)
@@ -128,7 +131,8 @@ class ProductoDialog(tk.Toplevel):
         def _update_labels(*args):
             suf = " (Kg)" if self.v_por_peso.get() else ""
             if self.lbl_stock: self.lbl_stock.config(text=f"Stock inicial{suf}")
-            if self.lbl_precio: self.lbl_precio.config(text=f"Precio{suf}")
+            if self.lbl_precio: self.lbl_precio.config(text=f"Precio Venta{suf}")
+            if hasattr(self, 'lbl_costo') and self.lbl_costo: self.lbl_costo.config(text=f"Precio Costo{suf}")
             
         self.v_por_peso.trace_add("write", _update_labels)
         _update_labels()
@@ -156,13 +160,14 @@ class ProductoDialog(tk.Toplevel):
             stock  = float(stock_str)
             minimo_str = self.v_minimo.get().replace(" Kg", "")
             minimo = float(minimo_str)
+            precio_costo = float(self.v_precio_costo.get())
             precio = float(self.v_precio.get())
             por_peso = 1 if self.v_por_peso.get() else 0
         except ValueError:
-            messagebox.showerror("Datos inválidos", "Stock, mínimo y precio deben ser numéricos.", parent=self)
+            messagebox.showerror("Datos inválidos", "Stock, mínimo y precios deben ser numéricos.", parent=self)
             return
 
-        self.resultado = (codigo, nombre, categoria, marca, stock, minimo, precio, por_peso)
+        self.resultado = (codigo, nombre, categoria, marca, stock, minimo, precio, por_peso, precio_costo)
         self.destroy()
 
 class EdicionMasivaDialog(tk.Toplevel):
@@ -1390,9 +1395,19 @@ class ReporteCapitalDialog(tk.Toplevel):
         # Header
         header = tk.Frame(self, bg=BG2, pady=20)
         header.pack(fill="x")
-        tk.Label(header, text="💰 Capital Total (Stock × Precio)", bg=BG2, fg=TEXT_DIM, font=("Segoe UI", 12)).pack()
-        self.lbl_total = tk.Label(header, text="$ 0.00", bg=BG2, fg=SUCCESS, font=("Segoe UI", 28, "bold"))
-        self.lbl_total.pack()
+        
+        # Split header into two columns
+        h_left = tk.Frame(header, bg=BG2)
+        h_left.pack(side="left", expand=True)
+        tk.Label(h_left, text="Capital Invertido (Costo)", bg=BG2, fg=TEXT_DIM, font=("Segoe UI", 12)).pack()
+        self.lbl_costo = tk.Label(h_left, text="$ 0.00", bg=BG2, fg=SUCCESS, font=("Segoe UI", 24, "bold"))
+        self.lbl_costo.pack()
+
+        h_right = tk.Frame(header, bg=BG2)
+        h_right.pack(side="left", expand=True)
+        tk.Label(h_right, text="Ganancia Potencial (Venta)", bg=BG2, fg=TEXT_DIM, font=("Segoe UI", 12)).pack()
+        self.lbl_venta = tk.Label(h_right, text="$ 0.00", bg=BG2, fg=WARNING, font=("Segoe UI", 24, "bold"))
+        self.lbl_venta.pack()
         
         # Body
         body = tk.Frame(self, bg=BG)
@@ -1517,7 +1532,8 @@ class ReporteCapitalDialog(tk.Toplevel):
         sel_marca_idx = self.lb_marca.curselection()
         sel_marcas = {self.marcas[i] for i in sel_marca_idx}
         
-        total = 0.0
+        total_venta = 0.0
+        total_costo = 0.0
         for p in self.productos:
             if p["id"] in self.excluidos_ids: continue
             
@@ -1529,10 +1545,16 @@ class ReporteCapitalDialog(tk.Toplevel):
             
             stock = float(p["stock"] or 0)
             precio = float(p["precio"] or 0)
-            if stock > 0 and precio > 0:
-                total += stock * precio
+            precio_costo = float(p.get("precio_costo", 0) or 0)
+            
+            if stock > 0:
+                if precio > 0:
+                    total_venta += stock * precio
+                if precio_costo > 0:
+                    total_costo += stock * precio_costo
                 
-        self.lbl_total.config(text=f"$ {total:,.2f}")
+        self.lbl_costo.config(text=f"$ {total_costo:,.2f}")
+        self.lbl_venta.config(text=f"$ {total_venta:,.2f}")
 
 # ──────────────────────────────────────────────
 #  Ventana de Importación (Asistente de Mapeo)
@@ -1612,13 +1634,14 @@ class ImportarDialog(tk.Toplevel):
         self.btn_importar.pack(side="right", padx=20)
         
         campos_sistema = [
-            ("nombre",    "Nombre (Requerido)", True, "", "", ""),
-            ("codigo",    "Código", False, "", "", ""),
-            ("categoria", "Categoría", False, "", "", ""),
-            ("marca",     "Marca", False, "", "", ""),
-            ("precio",    "Precio", False, "", "", ""),
-            ("stock",     "Stock Inicial", False, "", "", ""),
-            ("minimo",    "Stock Mínimo", False, "", "", "")
+            ("nombre",       "Nombre (Requerido)", True, "", "", ""),
+            ("codigo",       "Código", False, "", "", ""),
+            ("categoria",    "Categoría", False, "", "", ""),
+            ("marca",        "Marca", False, "", "", ""),
+            ("precio_costo", "Precio Costo", False, "", "", ""),
+            ("precio",       "Precio Venta", False, "", "", ""),
+            ("stock",        "Stock Inicial", False, "", "", ""),
+            ("minimo",       "Stock Mínimo", False, "", "", "")
         ]
         
         for i, (key, label, req, d_col, d_in, d_fin) in enumerate(campos_sistema, start=1):
@@ -3478,7 +3501,8 @@ class StockApp(tk.Tk):
             self.tree_ed.insert("", "end", iid=str(p["id"]), tags=(tag,),
                                 values=(sel_str, p.get("codigo",""), p.get("nombre",""),
                                         p.get("marca","") or "", p.get("categoria","") or "",
-                                        fmt_qty(stock_num, p.get("por_peso", 0)), f"${p.get('precio',0):,.2f}"))
+                                        fmt_qty(stock_num, p.get("por_peso", 0)), 
+                                        f"${p.get('precio_costo',0):,.2f}", f"${p.get('precio',0):,.2f}"))
             visible_index += 1
             
         if y_scroll_ed:
@@ -3665,10 +3689,12 @@ class StockApp(tk.Tk):
                     except: minimo = 0
                     try: precio = float(item.get("precio", 0.0))
                     except: precio = 0.0
+                    try: precio_costo = float(item.get("precio_costo", 0.0))
+                    except: precio_costo = 0.0
 
 
                     # Llamar al upsert
-                    is_new, cambios = db.upsert_producto(codigo, nombre, categoria, marca, stock, minimo, precio)
+                    is_new, cambios = db.upsert_producto(codigo, nombre, categoria, marca, stock, minimo, precio, 0, precio_costo)
                     if is_new:
                         nombres_nuevos.append(nombre)
                     else:
