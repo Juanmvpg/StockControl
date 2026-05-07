@@ -1248,6 +1248,9 @@ class SalidaMultipleDialog(tk.Toplevel):
         # Generar un ID de grupo simple incremental
         grupo_id = db.get_incremental_order()
 
+        # FASE 1: Validación y cálculo
+        movimientos_a_registrar = []
+        
         for pid, data in self.items.items():
             p = data["prod"]
             cant = float(data["cant"]) if p.get("por_peso", 0) else int(float(str(data["cant"])))
@@ -1292,6 +1295,7 @@ class SalidaMultipleDialog(tk.Toplevel):
             if subtotal_item < 0: subtotal_item = 0.0
             
             # Replicar la logica de control de stock
+            forzar_salida = False
             if stock_actual < cant:
                 resp = messagebox.askyesno(
                     "⚠️ Stock insuficiente",
@@ -1302,12 +1306,30 @@ class SalidaMultipleDialog(tk.Toplevel):
                     icon="warning", parent=self
                 )
                 if resp:
-                    nota_exc = (nota + " [EXCEPCIÓN: stock insuficiente]").strip()
-                    db.registrar_movimiento(pid, "salida", cant, nota_exc, forzar=True, precio_total=subtotal_item, grupo_id=grupo_id)
+                    forzar_salida = True
+                    nota = (nota + " [EXCEPCIÓN: stock insuficiente]").strip()
                 else:
                     return # Abort confirmation and keep window open for corrections
-            else:
-                db.registrar_movimiento(pid, "salida", cant, nota, forzar=False, precio_total=subtotal_item, grupo_id=grupo_id)
+                    
+            movimientos_a_registrar.append({
+                "pid": pid,
+                "cant": cant,
+                "nota": nota,
+                "forzar": forzar_salida,
+                "precio_total": subtotal_item
+            })
+
+        # FASE 2: Registro en Base de Datos
+        for mov in movimientos_a_registrar:
+            db.registrar_movimiento(
+                mov["pid"], 
+                "salida", 
+                mov["cant"], 
+                mov["nota"], 
+                forzar=mov["forzar"], 
+                precio_total=mov["precio_total"], 
+                grupo_id=grupo_id
+            )
 
         self.resultado = True
         self.destroy()
