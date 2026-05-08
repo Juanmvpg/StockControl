@@ -1467,41 +1467,79 @@ class ILovePdfDialog(tk.Toplevel):
         self.lbl_status.config(text="Subiendo a iLovePDF y procesando... Esto puede tardar unos segundos.", fg=WARNING)
         self.update()
         
-        def run_conversion():
-            try:
-                from pylovepdf.ilovepdf import ILovePdf
-                import pylovepdf.tools.pdfaexcel  # Required for PyInstaller to bundle the dynamic import
-                import os
-                ilovepdf = ILovePdf(self.api_key, verify_ssl=True)
-                task = ilovepdf.new_task('pdfaexcel')
-                task.add_file(filepath)
-                task.set_output_folder(os.path.dirname(savepath))
-                task.execute()
-                task.download()
-                task.delete_current_task()
-                
-                # The downloaded file has a specific name depending on the input, we rename it
-                # Usually it's the same name but .xlsx
-                downloaded_file = os.path.join(os.path.dirname(savepath), pathlib.Path(filepath).stem + ".xlsx")
-                if os.path.exists(downloaded_file) and downloaded_file != savepath:
-                    if os.path.exists(savepath):
-                        os.remove(savepath)
-                    os.rename(downloaded_file, savepath)
-                
-                self.after(0, lambda: self.deiconify())
-                self.after(0, lambda: self.lift())
-                self.after(0, lambda: self.focus_force())
-                self.after(0, lambda: self.lbl_status.config(text="¡Conversión exitosa!", fg=SUCCESS))
-                self.after(0, lambda: messagebox.showinfo("Listo", f"El archivo Excel ha sido guardado en:\n{savepath}", parent=self))
-            except Exception as e:
-                self.after(0, lambda: self.deiconify())
-                self.after(0, lambda: self.lift())
-                self.after(0, lambda: self.focus_force())
-                self.after(0, lambda: self.lbl_status.config(text="Error en la conversión.", fg=DANGER))
-                self.after(0, lambda: messagebox.showerror("Error", f"Ocurrió un error con iLovePDF:\n{e}", parent=self))
-                
-        import threading
-        threading.Thread(target=run_conversion, daemon=True).start()
+        def run_conversion():
+            try:
+                import requests
+                import os
+
+                # 1. Auth
+                auth_resp = requests.post("https://api.ilovepdf.com/v1/auth",
+                                          data={"public_key": self.api_key})
+                if not auth_resp.ok:
+                    raise Exception(f"Autenticación fallida. Verifica tu clave API.\n({auth_resp.text})")
+                token = auth_resp.json().get("token")
+                headers = {"Authorization": f"Bearer {token}"}
+
+                # 2. Start Task
+                start_resp = requests.get("https://api.ilovepdf.com/v1/start/pdfexcel",
+                                          headers=headers)
+                if not start_resp.ok:
+                    raise Exception(f"No se pudo iniciar la tarea.\n({start_resp.text})")
+                start_data = start_resp.json()
+                server = start_data.get("server")
+                task_id = start_data.get("task")
+
+                # 3. Upload File
+                with open(filepath, 'rb') as f:
+                    upload_resp = requests.post(
+                        f"https://{server}/v1/upload",
+                        headers=headers,
+                        data={"task": task_id},
+                        files={"file": f})
+                if not upload_resp.ok:
+                    raise Exception(f"No se pudo subir el PDF.\n({upload_resp.text})")
+                server_filename = upload_resp.json().get("server_filename")
+
+                # 4. Process
+                process_resp = requests.post(
+                    f"https://{server}/v1/process",
+                    headers=headers,
+                    data={
+                        "task": task_id,
+                        "tool": "pdfexcel",
+                        "files[0][server_filename]": server_filename,
+                        "files[0][filename]": os.path.basename(filepath),
+                    })
+                if not process_resp.ok:
+                    raise Exception(f"No se pudo procesar la conversión.\n({process_resp.text})")
+
+                # 5. Download
+                download_resp = requests.get(
+                    f"https://{server}/v1/download/{task_id}",
+                    headers=headers, stream=True)
+                if not download_resp.ok:
+                    raise Exception("No se pudo descargar el Excel convertido.")
+
+                with open(savepath, 'wb') as f:
+                    for chunk in download_resp.iter_content(chunk_size=8192):
+                        f.write(chunk)
+
+                self.after(0, lambda: self.deiconify())
+                self.after(0, lambda: self.lift())
+                self.after(0, lambda: self.focus_force())
+                self.after(0, lambda: self.lbl_status.config(text="¡Conversión exitosa!", fg=SUCCESS))
+                self.after(0, lambda: messagebox.showinfo("Listo",
+                    f"El archivo Excel ha sido guardado en:\n{savepath}", parent=self))
+            except Exception as e:
+                self.after(0, lambda: self.deiconify())
+                self.after(0, lambda: self.lift())
+                self.after(0, lambda: self.focus_force())
+                self.after(0, lambda: self.lbl_status.config(text="Error en la conversión.", fg=DANGER))
+                self.after(0, lambda e=e: messagebox.showerror("Error",
+                    f"Ocurrió un error con iLovePDF:\n{str(e)}", parent=self))
+
+        import threading
+        threading.Thread(target=run_conversion, daemon=True).start()
 
 class ReporteCapitalDialog(tk.Toplevel):
     def __init__(self, parent):
