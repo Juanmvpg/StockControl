@@ -477,14 +477,13 @@ def get_stock_bajo():
 #  Exportación
 # ──────────────────────────────────────────────
 
-def exportar_csv(filepath):
+def exportar_excel(filepath):
+    import pandas as pd
     productos = get_productos()
     if not productos:
         return 0
-    with open(filepath, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=productos[0].keys())
-        writer.writeheader()
-        writer.writerows(productos)
+    df = pd.DataFrame(productos)
+    df.to_excel(filepath, index=False)
     return len(productos)
 
 

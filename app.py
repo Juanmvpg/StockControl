@@ -1898,7 +1898,7 @@ class StockApp(tk.Tk):
         menu_datos = tk.Menu(mb_datos, tearoff=0, bg=BG3, fg=TEXT,
                              activebackground=ACCENT, activeforeground=TEXT,
                              font=("Segoe UI", 9))
-        menu_datos.add_command(label="⬇  Exportar CSV", command=self._exportar_csv)
+        menu_datos.add_command(label="⬇  Exportar XLSX", command=self._exportar_excel)
         menu_datos.add_command(label="⬆  Importar archivo", command=self._importar_datos)
         menu_datos.add_separator()
         menu_datos.add_command(label="💰  Reporte de Capital", command=self._abrir_reporte_capital)
@@ -1940,7 +1940,7 @@ class StockApp(tk.Tk):
         # Inicializamos `self.tree_ed` aquí arriba para evitar AttributeError en los callbacks posteriores
         tree_frame_ed = tk.Frame(parent, bg=BG)
         # Se empacará después del buscador
-        self.tree_ed = ttk.Treeview(tree_frame_ed, columns=("sel", "codigo", "nombre", "marca", "categoria", "stock", "precio"), show="headings", selectmode="extended")
+        self.tree_ed = ttk.Treeview(tree_frame_ed, columns=("sel", "codigo", "nombre", "marca", "categoria", "stock", "costo", "precio"), show="headings", selectmode="extended")
 
         # Búsqueda + filtros de categoría / marca para Edición
         search_frame_ed = tk.Frame(parent, bg=BG)
@@ -1988,9 +1988,9 @@ class StockApp(tk.Tk):
         # ── Lista de productos (duplicado editable) ──────────────
         tree_frame_ed.pack(fill="both", expand=True, padx=10, pady=(4, 8))
 
-        cols_ed = ("sel", "codigo", "nombre", "marca", "categoria", "stock", "precio")
-        hdrs_ed = ("[F2]", "Código", "Nombre", "Marca", "Categoría", "Stock", "Precio")
-        widths_ed   = (35, 90, 200, 110, 110, 70, 80)
+        cols_ed = ("sel", "codigo", "nombre", "marca", "categoria", "stock", "costo", "precio")
+        hdrs_ed = ("[F2]", "Código", "Nombre", "Marca", "Categoría", "Stock", "Costo", "Precio Venta")
+        widths_ed   = (35, 90, 200, 110, 110, 70, 80, 80)
         for col, hdr, w in zip(cols_ed, hdrs_ed, widths_ed):
             self.tree_ed.heading(col, text=hdr)
             self.tree_ed.column(col, width=w, anchor="w" if col == "nombre" else "center")
@@ -3699,14 +3699,14 @@ class StockApp(tk.Tk):
     def _abrir_reporte_capital(self):
         ReporteCapitalDialog(self)
         
-    def _exportar_csv(self):
+    def _exportar_excel(self):
         filepath = filedialog.asksaveasfilename(
-            defaultextension=".csv",
-            filetypes=[("CSV", "*.csv"), ("Todos", "*.*")],
+            defaultextension=".xlsx",
+            filetypes=[("Excel", "*.xlsx"), ("Todos", "*.*")],
             title="Guardar inventario como…"
         )
         if filepath:
-            n = db.exportar_csv(filepath)
+            n = db.exportar_excel(filepath)
             messagebox.showinfo("Exportación exitosa", f"Se exportaron {n} productos a:\n{filepath}")
 
     def _importar_datos(self):
