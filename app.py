@@ -2406,6 +2406,27 @@ class StockApp(tk.Tk):
         import webbrowser
         webbrowser.open("https://docs.google.com/spreadsheets/u/0/")
 
+    def _abrir_dashboard_ventas(self):
+        import webbrowser
+        import sys
+        from pathlib import Path
+        
+        if getattr(sys, 'frozen', False):
+            base_dir = Path(sys._MEIPASS)
+        else:
+            base_dir = Path(__file__).parent
+            
+        ruta = base_dir / "dashboard_ventas.html"
+        
+        if ruta.exists():
+            webbrowser.open(ruta.as_uri())
+        else:
+            ruta_alt = Path(sys.executable).parent / "dashboard_ventas.html"
+            if ruta_alt.exists():
+                webbrowser.open(ruta_alt.as_uri())
+            else:
+                messagebox.showerror("Error", "No se encontró el archivo dashboard_ventas.html")
+
     # ── Pestaña Productos ─────────────────────────
 
     def _build_tab_productos(self, parent):
