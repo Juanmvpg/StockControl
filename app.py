@@ -1398,60 +1398,22 @@ class ImportacionResumenDialog(tk.Toplevel):
 class ILovePdfDialog(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
-        self.title("Convertidor PDF a Excel (iLovePDF)")
-        self.geometry("500x350")
+        self.title("Convertidor PDF a Excel")
+        self.geometry("450x250")
         self.configure(bg=BG)
         self.transient(parent)
         self.grab_set()
-        
-        # Check API Key
-        self.api_key = db.get_config("ilovepdf_api_key", "")
-        
-        lbl_title = tk.Label(self, text="Conversión Inteligente con iLovePDF", bg=BG, fg=TEXT, font=("Segoe UI", 12, "bold"))
-        lbl_title.pack(pady=10)
-        
-        self.frame_key = tk.Frame(self, bg=BG)
-        self.frame_key.pack(fill="x", padx=20, pady=5)
-        
-        tk.Label(self.frame_key, text="Para usar este servicio gratuito necesitas una Clave API Pública.", bg=BG, fg=TEXT_DIM, wraplength=450).pack(anchor="w")
-        
-        link = tk.Label(self.frame_key, text="1. Haz clic aquí para registrarte y obtener tu clave gratis", fg=ACCENT, bg=BG, cursor="hand2")
-        link.pack(anchor="w", pady=(5,0))
-        link.bind("<Button-1>", lambda e: __import__('webbrowser').open("https://developer.ilovepdf.com/signup"))
-        
-        key_box = tk.Frame(self.frame_key, bg=BG)
-        key_box.pack(fill="x", pady=5)
-        tk.Label(key_box, text="Public Key:", bg=BG, fg=TEXT).pack(side="left")
-        self.entry_key = entry(key_box, width=40)
-        self.entry_key.pack(side="left", padx=5)
-        self.entry_key.insert(0, self.api_key)
-        
-        styled_btn(key_box, "Guardar", self.guardar_key, color=SUCCESS).pack(side="left")
-        
-        # Convert Area
-        self.frame_convert = tk.Frame(self, bg=BG)
-        self.frame_convert.pack(fill="both", expand=True, padx=20, pady=10)
-        
-        if not self.api_key:
-            self.frame_convert.pack_forget()
-            
-        tk.Label(self.frame_convert, text="Selecciona un PDF de tu proveedor para convertir a Excel:", bg=BG, fg=TEXT).pack(anchor="w", pady=5)
-        
-        btn_seleccionar = styled_btn(self.frame_convert, "📂 Seleccionar PDF y Convertir", self.convertir_pdf, color=ACCENT)
-        btn_seleccionar.pack(pady=10)
-        
-        self.lbl_status = tk.Label(self.frame_convert, text="", bg=BG, fg=TEXT_DIM)
+
+        lbl_title = tk.Label(self, text="Convertir lista de precios PDF a Excel", bg=BG, fg=TEXT, font=("Segoe UI", 12, "bold"))
+        lbl_title.pack(pady=15)
+
+        tk.Label(self, text="Selecciona un PDF de tu proveedor para extraer\nlos productos y precios a un archivo Excel.", bg=BG, fg=TEXT_DIM, wraplength=400).pack(pady=5)
+
+        btn_seleccionar = styled_btn(self, "📂 Seleccionar PDF y Convertir", self.convertir_pdf, color=ACCENT)
+        btn_seleccionar.pack(pady=15)
+
+        self.lbl_status = tk.Label(self, text="", bg=BG, fg=TEXT_DIM)
         self.lbl_status.pack(pady=5)
-        
-    def guardar_key(self):
-        k = self.entry_key.get().strip()
-        if not k:
-            messagebox.showwarning("Error", "Debes ingresar una clave API.", parent=self)
-            return
-        db.set_config("ilovepdf_api_key", k)
-        self.api_key = k
-        self.frame_convert.pack(fill="both", expand=True, padx=20, pady=10)
-        messagebox.showinfo("Guardado", "Clave guardada correctamente.", parent=self)
         
     def convertir_pdf(self):
         filepath = filedialog.askopenfilename(
@@ -1469,74 +1431,54 @@ class ILovePdfDialog(tk.Toplevel):
         
         def run_conversion():
             try:
-                import requests
+                import pdfplumber
+                import pandas as pd
                 import os
 
-                # 1. Auth
-                auth_resp = requests.post("https://api.ilovepdf.com/v1/auth",
-                                          data={"public_key": self.api_key})
-                if not auth_resp.ok:
-                    raise Exception(f"Autenticación fallida. Verifica tu clave API.\n({auth_resp.text})")
-                token = auth_resp.json().get("token")
-                headers = {"Authorization": f"Bearer {token}"}
+                all_data = []
+                with pdfplumber.open(filepath) as pdf:
+                    for page in pdf.pages:
+                        tables = page.extract_tables()
+                        for table in tables:
+                            for row in table:
+                                clean_row = [str(cell).strip() if cell is not None else '' for cell in row]
+                                if not any(clean_row):
+                                    continue
+                                first = clean_row[0].upper()
+                                if any(skip in first for skip in ['PRODUCTOS', 'LISTA DE PRECIOS', 'DISTRIBUIDORA', 'COMPRAS SUPERIORES', 'POR CUALQUIER']):
+                                    continue
+                                all_data.append(clean_row)
 
-                # 2. Start Task
-                start_resp = requests.get("https://api.ilovepdf.com/v1/start/pdfexcel",
-                                          headers=headers)
-                if not start_resp.ok:
-                    raise Exception(f"No se pudo iniciar la tarea.\n({start_resp.text})")
-                start_data = start_resp.json()
-                server = start_data.get("server")
-                task_id = start_data.get("task")
+                if not all_data:
+                    raise Exception('No se encontraron datos tabulares en el PDF.')
 
-                # 3. Upload File
-                with open(filepath, 'rb') as f:
-                    upload_resp = requests.post(
-                        f"https://{server}/v1/upload",
-                        headers=headers,
-                        data={"task": task_id},
-                        files={"file": f})
-                if not upload_resp.ok:
-                    raise Exception(f"No se pudo subir el PDF.\n({upload_resp.text})")
-                server_filename = upload_resp.json().get("server_filename")
+                max_cols = max(len(row) for row in all_data)
+                standardized = [row + [''] * (max_cols - len(row)) for row in all_data]
+                columns = [f'Columna_{i+1}' for i in range(max_cols)]
+                if max_cols >= 4:
+                    columns[0] = 'Producto'
+                    columns[1] = 'Precio'
+                    columns[3] = 'Marca_o_Cat'
 
-                # 4. Process
-                process_resp = requests.post(
-                    f"https://{server}/v1/process",
-                    headers=headers,
-                    data={
-                        "task": task_id,
-                        "tool": "pdfexcel",
-                        "files[0][server_filename]": server_filename,
-                        "files[0][filename]": os.path.basename(filepath),
-                    })
-                if not process_resp.ok:
-                    raise Exception(f"No se pudo procesar la conversión.\n({process_resp.text})")
-
-                # 5. Download
-                download_resp = requests.get(
-                    f"https://{server}/v1/download/{task_id}",
-                    headers=headers, stream=True)
-                if not download_resp.ok:
-                    raise Exception("No se pudo descargar el Excel convertido.")
-
-                with open(savepath, 'wb') as f:
-                    for chunk in download_resp.iter_content(chunk_size=8192):
-                        f.write(chunk)
+                df = pd.DataFrame(standardized, columns=columns)
+                df.replace('', pd.NA, inplace=True)
+                df.dropna(axis=1, how='all', inplace=True)
+                df.fillna('', inplace=True)
+                df.to_excel(savepath, index=False)
 
                 self.after(0, lambda: self.deiconify())
                 self.after(0, lambda: self.lift())
                 self.after(0, lambda: self.focus_force())
-                self.after(0, lambda: self.lbl_status.config(text="¡Conversión exitosa!", fg=SUCCESS))
-                self.after(0, lambda: messagebox.showinfo("Listo",
-                    f"El archivo Excel ha sido guardado en:\n{savepath}", parent=self))
+                self.after(0, lambda: self.lbl_status.config(text=f'Conversión exitosa! {len(df)} filas extraídas.', fg=SUCCESS))
+                self.after(0, lambda: messagebox.showinfo('Listo',
+                    f'El archivo Excel ha sido guardado en:\n{savepath}\n\n{len(df)} filas extraídas.', parent=self))
             except Exception as e:
                 self.after(0, lambda: self.deiconify())
                 self.after(0, lambda: self.lift())
                 self.after(0, lambda: self.focus_force())
-                self.after(0, lambda: self.lbl_status.config(text="Error en la conversión.", fg=DANGER))
-                self.after(0, lambda e=e: messagebox.showerror("Error",
-                    f"Ocurrió un error con iLovePDF:\n{str(e)}", parent=self))
+                self.after(0, lambda: self.lbl_status.config(text='Error en la conversión.', fg=DANGER))
+                self.after(0, lambda e=e: messagebox.showerror('Error',
+                    f'Ocurrió un error:\n{str(e)}', parent=self))
 
         import threading
         threading.Thread(target=run_conversion, daemon=True).start()
