@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard de Ventas — Análisis de Rentabilidad</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js">
+function generateCombinationsTable(ventas) {
+  const ordersMap = {};
+  ventas.forEach(v => {
+    if(v.orden) {
+      if(!ordersMap[v.orden]) ordersMap[v.orden] = [];
+      if(!ordersMap[v.orden].includes(v.producto)) {
+        ordersMap[v.orden].push(v.producto);
+      }
+    }
+  });
+
+  const combinations = {};
+  Object.values(ordersMap).forEach(items => {
+    if (items.length > 1) {
+      const sortedItems = items.slice().sort();
+      for (let i = 0; i < sortedItems.length; i++) {
+        for (let j = i + 1; j < sortedItems.length; j++) {
+          const pair = sortedItems[i] + " y " + sortedItems[j];
+          combinations[pair] = (combinations[pair] || 0) + 1;
+        }
+      }
+    }
+  });
+
+  const sortedCombos = Object.entries(combinations)
+    .filter(([pair, count]) => count > 1)
+    .sort((a, b) => b[1] - a[1]);
+
+  const container = document.getElementById('combos-section-container');
+  const tbody = document.getElementById('tabla-combos');
+  tbody.innerHTML = '';
+
+  if (sortedCombos.length > 0) {
+    container.style.display = 'block';
+    sortedCombos.forEach((combo, i) => {
+      const pairText = combo[0];
+      const count = combo[1];
+      
+      let badge = '';
+      if (i === 0) badge = '<span style="background:#dcfce3; color:#166534; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:600;">Combo Estrella</span>';
+      
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-weight:500;">${pairText}</td>
+        <td class="right mono"><span style="background:var(--surface2); padding:3px 8px; border-radius:12px; font-weight:600; color:var(--accent);">${count} veces</span></td>
+        <td style="color:var(--muted); font-size:0.8rem;">¡Crea un combo con estos dos! ${badge}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } else {
+    container.style.display = 'none';
+  }
+}
+
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
+function generateCombinationsTable(ventas) {
+  const ordersMap = {};
+  ventas.forEach(v => {
+    if(v.orden) {
+      if(!ordersMap[v.orden]) ordersMap[v.orden] = [];
+      if(!ordersMap[v.orden].includes(v.producto)) {
+        ordersMap[v.orden].push(v.producto);
+      }
+    }
+  });
+
+  const combinations = {};
+  Object.values(ordersMap).forEach(items => {
+    if (items.length > 1) {
+      const sortedItems = items.slice().sort();
+      for (let i = 0; i < sortedItems.length; i++) {
+        for (let j = i + 1; j < sortedItems.length; j++) {
+          const pair = sortedItems[i] + " y " + sortedItems[j];
+          combinations[pair] = (combinations[pair] || 0) + 1;
+        }
+      }
+    }
+  });
+
+  const sortedCombos = Object.entries(combinations)
+    .filter(([pair, count]) => count > 1)
+    .sort((a, b) => b[1] - a[1]);
+
+  const container = document.getElementById('combos-section-container');
+  const tbody = document.getElementById('tabla-combos');
+  tbody.innerHTML = '';
+
+  if (sortedCombos.length > 0) {
+    container.style.display = 'block';
+    sortedCombos.forEach((combo, i) => {
+      const pairText = combo[0];
+      const count = combo[1];
+      
+      let badge = '';
+      if (i === 0) badge = '<span style="background:#dcfce3; color:#166534; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:600;">Combo Estrella</span>';
+      
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-weight:500;">${pairText}</td>
+        <td class="right mono"><span style="background:var(--surface2); padding:3px 8px; border-radius:12px; font-weight:600; color:var(--accent);">${count} veces</span></td>
+        <td style="color:var(--muted); font-size:0.8rem;">¡Crea un combo con estos dos! ${badge}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } else {
+    container.style.display = 'none';
+  }
+}
+
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --surface2: #f1f5f9;
+    --border: #e2e8f0;
+    --accent: #2563eb;
+    --accent2: #059669;
+    --accent3: #e11d48;
+    --accent4: #8b5cf6;
+    --text: #0f172a;
+    --muted: #64748b;
+    --font-display: 'Inter', sans-serif;
+    --font-mono: 'Roboto Mono', monospace;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-display);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body::before {
+      display: none;
+  }
+
+  .wrapper {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2.5rem 2rem;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 2.5rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1.5rem;
+  }
+
+  .header-left h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+    color: var(--text);
+  }
+
+  .header-left h1 span {
+    color: var(--accent);
+  }
+
+  .header-left p {
+    margin-top: 0.5rem;
+    color: var(--muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .upload-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .upload-btn:hover {
+    background: var(--surface2);
+    border-color: #cbd5e1;
+  }
+
+  .period-badge {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    text-align: right;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .period-badge .label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .period-badge .dates {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-top: 0.1rem;
+  }
+
+  /* Empty State */
+  .empty-state {
+    text-align: center;
+    padding: 5rem 2rem;
+    background: var(--surface);
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .empty-state-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .empty-state h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+  }
+
+  .empty-state p {
+    color: var(--muted);
+    font-size: 0.95rem;
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+
+  /* Dashboard Content */
+  .dashboard-content {
+    display: none;
+  }
+
+  /* KPI Cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    position: relative;
+    box-shadow: var(--shadow-sm);
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 4px;
+    border-radius: 8px 0 0 8px;
+  }
+
+  .kpi-card.c1::after { background: var(--accent); }
+  .kpi-card.c2::after { background: var(--accent2); }
+  .kpi-card.c3::after { background: var(--accent4); }
+  .kpi-card.c4::after { background: var(--accent3); }
+
+  .kpi-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+
+  .kpi-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+    color: var(--text);
+  }
+
+  .kpi-sub {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 0.5rem;
+    font-weight: 500;
+  }
+
+  /* Table */
+  .table-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-sm);
+    animation: fadeUp 0.7s ease both;
+    overflow-x: auto;
+  }
+
+  .chart-title {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+  }
+
+  .chart-heading {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    margin-top: 1rem;
+  }
+
+  thead th {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    border-bottom: 2px solid var(--border);
+    background: var(--surface2);
+  }
+  
+  thead th:first-child { border-top-left-radius: 6px; }
+  thead th:last-child { border-top-right-radius: 6px; }
+
+  thead th.right { text-align: right; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+  }
+
+  tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  tbody td {
+    padding: 0.875rem 1rem;
+    color: var(--text);
+    vertical-align: middle;
+  }
+
+  tbody td.right { text-align: right; }
+  tbody td.mono { font-family: var(--font-mono); font-weight: 500; font-size: 0.85rem; }
+
+  .rank-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: var(--surface2);
+    color: var(--muted);
+  }
+
+  .rank-num.gold { background: #fef08a; color: #854d0e; }
+  .rank-num.silver { background: #e2e8f0; color: #475569; }
+  .rank-num.bronze { background: #fed7aa; color: #9a3412; }
+
+  .bar-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .bar-fill {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--accent);
+    min-width: 2px;
+  }
+
+  /* Rentabilidad section */
+  .rentabilidad-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-sm);
+    animation: fadeUp 0.8s ease both;
+  }
+
+  .section-heading {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+  }
+
+  .section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    color: var(--text);
+  }
+
+  .tips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+  }
+
+  .tip-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.25rem;
+  }
+
+  .tip-icon {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .tip-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: var(--text);
+  }
+
+  .tip-body {
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* Cost placeholder */
+  .cost-placeholder {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    margin-bottom: 2rem;
+    animation: fadeUp 0.9s ease both;
+  }
+
+  .cost-placeholder h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #166534;
+    margin-bottom: 0.5rem;
+  }
+
+  .cost-placeholder p {
+    font-size: 0.9rem;
+    color: #15803d;
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 2rem 0 1rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  /* Animations */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .kpi-card:nth-child(1) { animation-delay: 0.05s; }
+  .kpi-card:nth-child(2) { animation-delay: 0.1s; }
+  .kpi-card:nth-child(3) { animation-delay: 0.15s; }
+  .kpi-card:nth-child(4) { animation-delay: 0.2s; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="header-left">
+      <h1>Análisis de <span>Ventas</span></h1>
+      <p>Dashboard de rentabilidad · POS Export</p>
+    </div>
+    
+    <div class="header-right">
+      <div class="period-badge">
+        <div class="label">Período</div>
+        <div class="dates" id="periodo-fechas">Esperando archivo...</div>
+      </div>
+      
+      <label for="fileInput" class="upload-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        Cargar Excel
+      </label>
+      <input type="file" id="fileInput" accept=".xlsx, .xls" style="display: none;" />
+    </div>
+  </header>
+
+  <div class="empty-state" id="empty-state">
+    <div class="empty-state-icon">📊</div>
+    <h2>Listo para analizar tus ventas</h2>
+    <p>Cargá tu archivo Excel (.xlsx) exportado de tu sistema POS para visualizar los KPIs, productos más vendidos y recibir sugerencias para mejorar tu rentabilidad.</p>
+  </div>
+
+  <div class="dashboard-content" id="dashboard-content">
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card c1">
+        <div class="kpi-label">Facturación Total</div>
+        <div class="kpi-value" id="kpi-revenue">$0</div>
+        <div class="kpi-sub" id="kpi-revenue-sub">0 órdenes registradas</div>
+      </div>
+      <div class="kpi-card c2">
+        <div class="kpi-label">Unidades Vendidas</div>
+        <div class="kpi-value" id="kpi-units">0</div>
+        <div class="kpi-sub" id="kpi-units-sub">en 0 productos distintos</div>
+      </div>
+      <div class="kpi-card c3">
+        <div class="kpi-label">Ticket Promedio</div>
+        <div class="kpi-value" id="kpi-ticket">$0</div>
+        <div class="kpi-sub" id="kpi-ticket-sub">por orden de venta</div>
+      </div>
+      <div class="kpi-card c4">
+        <div class="kpi-label">Precio Costo</div>
+        <div class="kpi-value">—</div>
+        <div class="kpi-sub">Pendiente de configurar</div>
+      </div>
+    </div>
+
+
+    <!-- Tabla detalle -->
+    <div class="table-card">
+      <div class="chart-title">Detalle</div>
+      <div class="chart-heading" style="margin-bottom:1rem">Ranking de productos por facturación</div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Producto</th>
+            <th class="right">Cant.</th>
+            <th class="right">Facturación</th>
+            <th class="right">Precio Unitario</th>
+            <th>Participación</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-productos"></tbody>
+      </table>
+    </div>
+
+    <!-- Placeholder Precio Costo -->
+    <div class="cost-placeholder">
+      <h3>⚙️ Precio Costo no configurado aún</h3>
+      <p>Una vez que configures el precio costo en tu POS, este dashboard calculará automáticamente el <strong>margen bruto por producto</strong>, el <strong>punto de equilibrio</strong> y los productos más y menos rentables. ¡Es el siguiente paso clave!</p>
+    </div>
+
+    <!-- Tips de rentabilidad -->
+    <div class="rentabilidad-section">
+      <div class="section-heading">Estrategia</div>
+      <div class="section-title">Ideas para mejorar la rentabilidad 💡</div>
+      <div class="tips-grid" id="tips-grid">
+        <!-- Tips dinámicos -->
+      </div>
+    </div>
+
+    <!-- Combos section -->
+    <div class="table-card" id="combos-section-container" style="display: none;">
+      <div class="chart-title">Análisis de Órdenes</div>
+      <div class="chart-heading" style="margin-bottom:1rem">Productos combinados frecuentemente</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Combinación detectada</th>
+            <th class="right">Frecuencia</th>
+            <th>Sugerencia</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-combos"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>Generado a partir del historial de ventas POS</footer>
+</div>
+
+<script>
+const COLORS = [
+  '#f0c040', '#3ecf8e', '#5c8de0', '#e05c5c',
+  '#b066e0', '#e08c3c', '#40c4f0', '#c0e040',
+  '#e040b0', '#60c080', '#e06060', '#80aaff'
+];
+const shortLabel = (s, max=22) => s && s.length > max ? s.slice(0, max) + '…' : (s || 'Desconocido');
+
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, {type: 'array'});
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(firstSheet);
+      processData(rows);
+    } catch(err) {
+      alert("Error al leer el archivo Excel. Asegurate de que sea un archivo válido.");
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+function getVal(row, possibleKeys) {
+  for (const k of Object.keys(row)) {
+    const kLow = k.toLowerCase().trim();
+    for (const pk of possibleKeys) {
+      if (kLow.includes(pk.toLowerCase())) return row[k];
+    }
+  }
+  return null;
+}
+
+function processData(rows) {
+  const ventas = rows.map(r => ({
+    orden: getVal(r, ['orden', 'n° orden', 'n orden']),
+    fecha: getVal(r, ['fecha', 'date']),
+    producto: getVal(r, ['producto', 'artículo', 'item']),
+    cantidad: parseFloat(getVal(r, ['cantidad', 'cant'])) || 0,
+    monto: parseFloat(getVal(r, ['monto', 'total', 'precio', 'subtotal'])) || 0,
+    forzado: getVal(r, ['forzado']),
+    nota: getVal(r, ['nota'])
+  })).filter(r => r.producto && (r.cantidad > 0 || r.monto > 0));
+
+  if (ventas.length === 0) {
+    alert("No se encontraron datos válidos de ventas en el archivo.");
+    return;
+  }
+
+  // Hide empty state, show dashboard
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('dashboard-content').style.display = 'block';
+
+  // Process Dates
+  const parseSafeDate = (dStr) => {
+    if(!dStr) return NaN;
+    let d = new Date(dStr);
+    if (!isNaN(d)) return d;
+    return NaN;
+  };
+  
+  const validDates = ventas.map(v => parseSafeDate(v.fecha)).filter(d => !isNaN(d));
+  if (validDates.length > 0) {
+    const minD = new Date(Math.min(...validDates));
+    const maxD = new Date(Math.max(...validDates));
+    const format = d => d.toLocaleDateString('es-AR', {day:'2-digit', month:'short', year:'numeric'}).replace('.','').toUpperCase();
+    document.getElementById('periodo-fechas').innerText = `${format(minD)} – ${format(maxD)}`;
+  } else {
+    document.getElementById('periodo-fechas').innerText = "Fecha no disponible";
+  }
+
+  // KPIs
+  const totalMonto = ventas.reduce((s, v) => s + v.monto, 0);
+  const totalUnidades = ventas.reduce((s, v) => s + v.cantidad, 0);
+  const ordenesUnicas = new Set(ventas.map(v => v.orden).filter(o => o)).size;
+  const productosUnicos = new Set(ventas.map(v => v.producto)).size;
+  const ticketPromedio = ordenesUnicas > 0 ? totalMonto / ordenesUnicas : 0;
+
+  document.getElementById('kpi-revenue').innerText = `$${totalMonto.toLocaleString('es-AR')}`;
+  document.getElementById('kpi-revenue-sub').innerText = `${ordenesUnicas} órdenes registradas`;
+  
+  document.getElementById('kpi-units').innerText = totalUnidades.toLocaleString('es-AR');
+  document.getElementById('kpi-units-sub').innerText = `en ${productosUnicos} productos distintos`;
+
+  document.getElementById('kpi-ticket').innerText = `$${Math.round(ticketPromedio).toLocaleString('es-AR')}`;
+  
+  // Aggregation
+  const agg = {};
+  for (const v of ventas) {
+    const k = v.producto;
+    if (!agg[k]) agg[k] = { cantidad: 0, monto: 0, count: 0 };
+    agg[k].cantidad += v.cantidad;
+    agg[k].monto += v.monto;
+    agg[k].count += 1;
+  }
+
+  const sorted = Object.entries(agg)
+    .map(([p, d]) => ({ producto: p, ...d, unitario: d.cantidad > 0 ? Math.round(d.monto / d.cantidad) : 0 }))
+    .sort((a, b) => b.monto - a.monto);
+
+  // Update Visuals
+  updateTable(sorted, totalMonto);
+  generateTips(ventas, sorted, totalMonto);
+  generateCombinationsTable(ventas);
+}
+
+
+function updateTable(sorted, total) {
+  const tbody = document.getElementById('tabla-productos');
+  tbody.innerHTML = '';
+  sorted.forEach((r, i) => {
+    const pct = total > 0 ? ((r.monto / total) * 100).toFixed(1) : 0;
+    const barW = Math.round((r.monto / sorted[0].monto) * 120);
+    
+    let rankClass = '';
+    if (i === 0) rankClass = 'gold';
+    else if (i === 1) rankClass = 'silver';
+    else if (i === 2) rankClass = 'bronze';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="rank-num ${rankClass}">${i + 1}</span></td>
+      <td>${r.producto}</td>
+      <td class="right mono">${r.cantidad}</td>
+      <td class="right mono">$${r.monto.toLocaleString('es-AR')}</td>
+      <td class="right mono">$${r.unitario.toLocaleString('es-AR')}</td>
+      <td>
+        <div class="bar-inline">
+          <div class="bar-fill" style="width:${barW}px; background:${COLORS[i % COLORS.length]}"></div>
+          <span style="font-family:var(--font-mono);font-size:0.72rem;color:var(--muted)">${pct}%</span>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function generateTips(ventas, sorted, totalMonto) {
+  const tipsGrid = document.getElementById('tips-grid');
+  tipsGrid.innerHTML = '';
+  
+  const addTip = (icon, title, body) => {
+    tipsGrid.innerHTML += `
+      <div class="tip-card">
+        <div class="tip-icon">${icon}</div>
+        <div class="tip-title">${title}</div>
+        <div class="tip-body">${body}</div>
+      </div>
+    `;
+  };
+
+  addTip('📦', 'Configurá el precio costo', 'Es la acción de mayor impacto. Con costo cargado, vas a poder ver tu margen real por producto y detectar cuáles te dan más ganancia por unidad vendida.');
+
+  if (sorted.length > 0) {
+    const topProd = sorted[0];
+    const pct = ((topProd.monto / totalMonto) * 100).toFixed(1);
+    addTip('🎯', `Enfocá en ${shortLabel(topProd.producto, 15)}`, `Generó $${topProd.monto.toLocaleString('es-AR')} con ${topProd.cantidad} unidades (${pct}% del total). Si el margen es alto, es candidato a promocionar activamente.`);
+  }
+
+  const stockIssues = ventas.filter(v => v.forzado?.toString().toLowerCase().includes('s') || v.nota?.toLowerCase().includes('stock'));
+  if (stockIssues.length > 0) {
+    addTip('📊', 'Analizá excepciones de stock', `Tuviste ${stockIssues.length} ventas con stock insuficiente o forzadas. Eso puede significar ventas perdidas futuras. Ajustar el stock mínimo te ayuda a no perder ventas.`);
+  }
+
+  // Combo suggestions are now moved to generateCombinationsTable
+  // But we keep the basic multi-order tip if they don't have many combos
+  const ordersMap = {};
+  ventas.forEach(v => {
+    if(v.orden) {
+      if(!ordersMap[v.orden]) ordersMap[v.orden] = [];
+      if(!ordersMap[v.orden].includes(v.producto)) {
+        ordersMap[v.orden].push(v.producto);
+      }
+    }
+  });
+  const multiItemOrders = Object.values(ordersMap).filter(items => items.length > 1).length;
+  if (multiItemOrders === 0) {
+    addTip('🔄', 'Promocioná Combos', 'Casi todas tus ventas son de un solo producto a la vez. Ofrecé artículos complementarios al momento de cobrar para aumentar tu ticket promedio.');
+  }
+
+  addTip('📅', 'Medí semana a semana', 'Con datos de más semanas vas a poder detectar tendencias, estacionalidad y qué productos se están desacelerando antes de que sea un problema.');
+}
+
+function generateCombinationsTable(ventas) {
+  const ordersMap = {};
+  ventas.forEach(v => {
+    if(v.orden) {
+      if(!ordersMap[v.orden]) ordersMap[v.orden] = [];
+      if(!ordersMap[v.orden].includes(v.producto)) {
+        ordersMap[v.orden].push(v.producto);
+      }
+    }
+  });
+
+  const combinations = {};
+  Object.values(ordersMap).forEach(items => {
+    if (items.length > 1) {
+      const sortedItems = items.slice().sort();
+      for (let i = 0; i < sortedItems.length; i++) {
+        for (let j = i + 1; j < sortedItems.length; j++) {
+          const pair = sortedItems[i] + " y " + sortedItems[j];
+          combinations[pair] = (combinations[pair] || 0) + 1;
+        }
+      }
+    }
+  });
+
+  const sortedCombos = Object.entries(combinations)
+    .filter(([pair, count]) => count > 1)
+    .sort((a, b) => b[1] - a[1]);
+
+  const container = document.getElementById('combos-section-container');
+  const tbody = document.getElementById('tabla-combos');
+  tbody.innerHTML = '';
+
+  if (sortedCombos.length > 0) {
+    container.style.display = 'block';
+    sortedCombos.forEach((combo, i) => {
+      const pairText = combo[0];
+      const count = combo[1];
+      
+      let badge = '';
+      if (i === 0) badge = '<span style="background:#dcfce3; color:#166534; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:600;">Combo Estrella</span>';
+      
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-weight:500;">${pairText}</td>
+        <td class="right mono"><span style="background:var(--surface2); padding:3px 8px; border-radius:12px; font-weight:600; color:var(--accent);">${count} veces</span></td>
+        <td style="color:var(--muted); font-size:0.8rem;">¡Crea un combo con estos dos! ${badge}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } else {
+    container.style.display = 'none';
+  }
+}
+
+</script>
+</body>
+</html>

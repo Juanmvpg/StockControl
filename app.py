@@ -1906,6 +1906,7 @@ class StockApp(tk.Tk):
         menu_datos.add_command(label="📦  Crear Copia de Seguridad", command=self._backup_db)
         menu_datos.add_separator()
         menu_datos.add_command(label="📊  Comparador de Listas", command=self._abrir_comparador_listas)
+        menu_datos.add_command(label="📈  Dashboard de Ventas", command=self._abrir_dashboard_ventas)
         menu_datos.add_command(label="📝  Hoja de Cálculo", command=self._abrir_hoja_calculo)
         mb_datos.config(menu=menu_datos)
         mb_datos.pack(side="right", padx=6)
