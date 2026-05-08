@@ -1495,9 +1495,15 @@ class ILovePdfDialog(tk.Toplevel):
                         os.remove(savepath)
                     os.rename(downloaded_file, savepath)
                 
+                self.after(0, lambda: self.deiconify())
+                self.after(0, lambda: self.lift())
+                self.after(0, lambda: self.focus_force())
                 self.after(0, lambda: self.lbl_status.config(text="¡Conversión exitosa!", fg=SUCCESS))
                 self.after(0, lambda: messagebox.showinfo("Listo", f"El archivo Excel ha sido guardado en:\n{savepath}", parent=self))
             except Exception as e:
+                self.after(0, lambda: self.deiconify())
+                self.after(0, lambda: self.lift())
+                self.after(0, lambda: self.focus_force())
                 self.after(0, lambda: self.lbl_status.config(text="Error en la conversión.", fg=DANGER))
                 self.after(0, lambda: messagebox.showerror("Error", f"Ocurrió un error con iLovePDF:\n{e}", parent=self))
                 
