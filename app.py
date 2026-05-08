@@ -1470,6 +1470,7 @@ class ILovePdfDialog(tk.Toplevel):
         def run_conversion():
             try:
                 from pylovepdf.ilovepdf import ILovePdf
+                import pylovepdf.tools.pdfaexcel  # Required for PyInstaller to bundle the dynamic import
                 import os
                 ilovepdf = ILovePdf(self.api_key, verify_ssl=True)
                 task = ilovepdf.new_task('pdfaexcel')
