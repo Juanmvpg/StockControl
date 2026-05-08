@@ -1461,17 +1461,9 @@ class ILovePdfDialog(tk.Toplevel):
         )
         if not filepath:
             return
-            
-        savepath = filedialog.asksaveasfilename(
-            defaultextension=".xlsx",
-            filetypes=[("Excel", "*.xlsx")],
-            title="Guardar archivo Excel convertido como...",
-            initialfile=pathlib.Path(filepath).stem + " - Convertido.xlsx",
-            parent=self
-        )
-        if not savepath:
-            return
-            
+        import pathlib
+        savepath = str(pathlib.Path(filepath).with_name(pathlib.Path(filepath).stem + " - Convertido.xlsx"))
+        
         self.lbl_status.config(text="Subiendo a iLovePDF y procesando... Esto puede tardar unos segundos.", fg=WARNING)
         self.update()
         
