@@ -1482,6 +1482,246 @@ class ILovePdfDialog(tk.Toplevel):
         import threading
         threading.Thread(target=run_conversion, daemon=True).start()
 
+
+class GenerarListaPdfDialog(tk.Toplevel):
+    """Diálogo para generar lista de precios en PDF."""
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("Generar Lista de Precios PDF")
+        self.geometry("420x380")
+        self.configure(bg=BG)
+        self.transient(parent)
+        self.resizable(False, False)
+
+        tk.Label(self, text="Generar Lista de Precios PDF", bg=BG, fg=TEXT,
+                 font=("Segoe UI", 13, "bold")).pack(pady=(15, 5))
+        tk.Label(self, text="Configura las opciones de tu lista:", bg=BG,
+                 fg=TEXT_DIM).pack(pady=(0, 10))
+
+        # --- Orden ---
+        frame_orden = tk.LabelFrame(self, text="Ordenar por", bg=BG, fg=TEXT,
+                                     font=("Segoe UI", 10, "bold"), padx=10, pady=8)
+        frame_orden.pack(fill="x", padx=20, pady=5)
+
+        self.var_orden = tk.StringVar(value="alfabetico")
+        opciones_orden = [
+            ("Alfabético (A-Z)", "alfabetico"),
+            ("Por Categoría", "categoria"),
+            ("Por Marca", "marca"),
+            ("Por Precio (menor a mayor)", "precio"),
+        ]
+        for texto, valor in opciones_orden:
+            rb = tk.Radiobutton(frame_orden, text=texto, variable=self.var_orden,
+                                value=valor, bg=BG, fg=TEXT, selectcolor=BG2,
+                                activebackground=BG, activeforeground=TEXT,
+                                font=("Segoe UI", 9))
+            rb.pack(anchor="w")
+
+        # --- Incluir sin stock ---
+        frame_stock = tk.Frame(self, bg=BG)
+        frame_stock.pack(fill="x", padx=20, pady=10)
+
+        self.var_sin_stock = tk.BooleanVar(value=False)
+        cb = tk.Checkbutton(frame_stock, text="Incluir productos sin stock",
+                            variable=self.var_sin_stock, bg=BG, fg=TEXT,
+                            selectcolor=BG2, activebackground=BG,
+                            activeforeground=TEXT, font=("Segoe UI", 10))
+        cb.pack(anchor="w")
+
+        # --- Botón generar ---
+        styled_btn(self, "📄 Generar PDF", self._generar, color=ACCENT).pack(pady=15)
+
+        self.lbl_status = tk.Label(self, text="", bg=BG, fg=TEXT_DIM)
+        self.lbl_status.pack()
+
+    def _generar(self):
+        import threading
+        self.lbl_status.config(text="Generando PDF...", fg=WARNING)
+        self.update()
+        threading.Thread(target=self._generar_pdf_thread, daemon=True).start()
+
+    def _generar_pdf_thread(self):
+        try:
+            from fpdf import FPDF
+            import os, sys
+            from pathlib import Path
+            from datetime import datetime
+
+            # --- Obtener productos ---
+            productos = db.get_productos()
+
+            # Filtrar sin stock si corresponde
+            if not self.var_sin_stock.get():
+                productos = [p for p in productos if (p.get("stock") or 0) > 0]
+
+            if not productos:
+                self.after(0, lambda: messagebox.showwarning("Sin datos",
+                    "No hay productos para incluir en la lista.", parent=self))
+                self.after(0, lambda: self.lbl_status.config(text="", fg=TEXT_DIM))
+                return
+
+            # --- Ordenar ---
+            orden = self.var_orden.get()
+            if orden == "alfabetico":
+                productos.sort(key=lambda p: (p.get("nombre") or "").lower())
+            elif orden == "categoria":
+                productos.sort(key=lambda p: ((p.get("categoria") or "Sin Categoría").lower(),
+                                              (p.get("nombre") or "").lower()))
+            elif orden == "marca":
+                productos.sort(key=lambda p: ((p.get("marca") or "Sin Marca").lower(),
+                                              (p.get("nombre") or "").lower()))
+            elif orden == "precio":
+                productos.sort(key=lambda p: p.get("precio") or 0)
+
+            # --- Logo path ---
+            if getattr(sys, 'frozen', False):
+                base_dir = Path(sys._MEIPASS)
+            else:
+                base_dir = Path(__file__).parent
+            logo_path = str(base_dir / "hornero_logo.png")
+            if not os.path.exists(logo_path):
+                logo_path = None
+
+            # --- Colores del estilo Profesional Clásico ---
+            HEADER_R, HEADER_G, HEADER_B = 44, 62, 80       # Azul oscuro
+            ACCENT_R, ACCENT_G, ACCENT_B = 52, 152, 219     # Azul acento
+            ALT_ROW_R, ALT_ROW_G, ALT_ROW_B = 235, 240, 245 # Gris claro alterno
+            CAT_BG_R, CAT_BG_G, CAT_BG_B = 52, 73, 94       # Fondo categoría
+
+            # --- Crear PDF ---
+            pdf = FPDF()
+            pdf.set_auto_page_break(auto=True, margin=20)
+            pdf.add_page()
+            page_w = pdf.w - 20  # margen izq 10 + der 10
+
+            # --- Encabezado ---
+            # Franja superior
+            pdf.set_fill_color(HEADER_R, HEADER_G, HEADER_B)
+            pdf.rect(0, 0, 210, 38, 'F')
+
+            # Logo
+            if logo_path:
+                pdf.image(logo_path, x=12, y=5, w=28)
+
+            # Título
+            pdf.set_xy(44, 8)
+            pdf.set_text_color(255, 255, 255)
+            pdf.set_font("Helvetica", "B", 18)
+            pdf.cell(0, 10, "Lista Jaulas Gonzalez", ln=True)
+
+            # Fecha
+            pdf.set_xy(44, 20)
+            pdf.set_font("Helvetica", "", 10)
+            fecha = datetime.now().strftime("%d/%m/%Y")
+            pdf.cell(0, 8, f"Fecha: {fecha}", ln=True)
+
+            pdf.ln(18)
+
+            # --- Encabezado de tabla ---
+            col_widths = [page_w * 0.42, page_w * 0.22, page_w * 0.20, page_w * 0.16]
+            headers = ["Producto", "Categoría", "Marca", "Precio"]
+
+            def draw_table_header():
+                pdf.set_fill_color(ACCENT_R, ACCENT_G, ACCENT_B)
+                pdf.set_text_color(255, 255, 255)
+                pdf.set_font("Helvetica", "B", 10)
+                for i, h in enumerate(headers):
+                    align = "R" if i == 3 else "L"
+                    pdf.cell(col_widths[i], 9, f"  {h}" if i < 3 else f"{h}  ",
+                             border=0, fill=True, align=align)
+                pdf.ln()
+
+            draw_table_header()
+
+            # --- Filas de productos ---
+            pdf.set_font("Helvetica", "", 9)
+            current_group = None
+            group_field = "categoria" if orden == "categoria" else ("marca" if orden == "marca" else None)
+
+            for idx, p in enumerate(productos):
+                # Separador de grupo si es por categoría o marca
+                if group_field:
+                    group_val = p.get(group_field) or ("Sin Categoría" if group_field == "categoria" else "Sin Marca")
+                    if group_val != current_group:
+                        current_group = group_val
+                        # Check page space
+                        if pdf.get_y() > 265:
+                            pdf.add_page()
+                            draw_table_header()
+                        pdf.set_fill_color(CAT_BG_R, CAT_BG_G, CAT_BG_B)
+                        pdf.set_text_color(255, 255, 255)
+                        pdf.set_font("Helvetica", "B", 10)
+                        pdf.cell(page_w, 8, f"  {current_group}", border=0, ln=True, fill=True)
+                        pdf.set_font("Helvetica", "", 9)
+
+                # Check page space
+                if pdf.get_y() > 272:
+                    pdf.add_page()
+                    draw_table_header()
+
+                # Fila alternada
+                is_alt = idx % 2 == 0
+                if is_alt:
+                    pdf.set_fill_color(ALT_ROW_R, ALT_ROW_G, ALT_ROW_B)
+                else:
+                    pdf.set_fill_color(255, 255, 255)
+
+                pdf.set_text_color(33, 33, 33)
+
+                nombre = (p.get("nombre") or "")[:45]
+                categoria = (p.get("categoria") or "")[:20]
+                marca = (p.get("marca") or "")[:18]
+                precio_val = p.get("precio") or 0
+                precio_str = f"${precio_val:,.2f}"
+
+                pdf.cell(col_widths[0], 7, f"  {nombre}", border=0, fill=True, align="L")
+                pdf.cell(col_widths[1], 7, f"  {categoria}", border=0, fill=True, align="L")
+                pdf.cell(col_widths[2], 7, f"  {marca}", border=0, fill=True, align="L")
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.cell(col_widths[3], 7, f"{precio_str}  ", border=0, fill=True, align="R")
+                pdf.set_font("Helvetica", "", 9)
+                pdf.ln()
+
+            # --- Pie de página ---
+            pdf.ln(5)
+            pdf.set_draw_color(ACCENT_R, ACCENT_G, ACCENT_B)
+            pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+            pdf.ln(3)
+            pdf.set_text_color(120, 120, 120)
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.cell(0, 5, f"Lista generada el {fecha}  |  {len(productos)} productos",
+                     align="C")
+
+            # --- Guardar ---
+            savepath = filedialog.asksaveasfilename(
+                defaultextension=".pdf",
+                filetypes=[("Archivo PDF", "*.pdf")],
+                initialfile=f"Lista Jaulas Gonzalez - {fecha.replace('/', '-')}.pdf",
+                title="Guardar lista de precios",
+                parent=self
+            )
+            if not savepath:
+                self.after(0, lambda: self.lbl_status.config(text="Cancelado.", fg=TEXT_DIM))
+                return
+
+            pdf.output(savepath)
+
+            self.after(0, lambda: self.deiconify())
+            self.after(0, lambda: self.lift())
+            self.after(0, lambda: self.focus_force())
+            self.after(0, lambda: self.lbl_status.config(
+                text=f"PDF generado con {len(productos)} productos.", fg=SUCCESS))
+            self.after(0, lambda: messagebox.showinfo("Listo",
+                f"Lista de precios guardada en:\n{savepath}\n\n{len(productos)} productos incluidos.",
+                parent=self))
+        except Exception as e:
+            self.after(0, lambda: self.deiconify())
+            self.after(0, lambda: self.lift())
+            self.after(0, lambda: self.focus_force())
+            self.after(0, lambda: self.lbl_status.config(text="Error al generar.", fg=DANGER))
+            self.after(0, lambda e=e: messagebox.showerror("Error",
+                f"Error al generar el PDF:\n{str(e)}", parent=self))
+
 class ReporteCapitalDialog(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
@@ -1994,6 +2234,7 @@ class StockApp(tk.Tk):
         menu_datos.add_command(label="📦  Crear Copia de Seguridad", command=self._backup_db)
         menu_datos.add_separator()
         menu_datos.add_command(label="📄  Convertir PDF a Excel", command=self._abrir_ilovepdf)
+        menu_datos.add_command(label="📋  Generar Lista de Precios PDF", command=self._abrir_generar_lista_pdf)
         menu_datos.add_command(label="📊  Comparador de Listas", command=self._abrir_comparador_listas)
         menu_datos.add_command(label="📈  Dashboard de Ventas", command=self._abrir_dashboard_ventas)
         menu_datos.add_command(label="📝  Hoja de Cálculo", command=self._abrir_hoja_calculo)
@@ -2498,6 +2739,9 @@ class StockApp(tk.Tk):
     
     def _abrir_ilovepdf(self):
         ILovePdfDialog(self)
+
+    def _abrir_generar_lista_pdf(self):
+        GenerarListaPdfDialog(self)
 
     def _abrir_dashboard_ventas(self):
         import webbrowser
