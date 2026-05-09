@@ -1625,10 +1625,11 @@ class GenerarListaPdfDialog(tk.Toplevel):
                 pdf.set_fill_color(ACCENT_R, ACCENT_G, ACCENT_B)
                 pdf.set_text_color(255, 255, 255)
                 pdf.set_font("Helvetica", "B", 10)
+                pdf.set_draw_color(255, 255, 255)
                 for i, h in enumerate(headers):
                     align = "R" if i == 3 else "L"
                     pdf.cell(col_widths[i], 9, f"  {h}" if i < 3 else f"{h}  ",
-                             border=0, fill=True, align=align)
+                             border="LR", fill=True, align=align)
                 pdf.ln()
 
             draw_table_header()
@@ -1651,7 +1652,8 @@ class GenerarListaPdfDialog(tk.Toplevel):
                         pdf.set_fill_color(CAT_BG_R, CAT_BG_G, CAT_BG_B)
                         pdf.set_text_color(255, 255, 255)
                         pdf.set_font("Helvetica", "B", 10)
-                        pdf.cell(page_w, 8, f"  {current_group}", border=0, ln=True, fill=True)
+                        pdf.set_draw_color(220, 220, 220)
+                        pdf.cell(page_w, 8, f"  {current_group}", border="LR", ln=True, fill=True)
                         pdf.set_font("Helvetica", "", 9)
 
                 # Check page space
@@ -1674,11 +1676,12 @@ class GenerarListaPdfDialog(tk.Toplevel):
                 precio_val = p.get("precio") or 0
                 precio_str = f"${precio_val:,.2f}"
 
-                pdf.cell(col_widths[0], 7, f"  {nombre}", border=0, fill=True, align="L")
-                pdf.cell(col_widths[1], 7, f"  {categoria}", border=0, fill=True, align="L")
-                pdf.cell(col_widths[2], 7, f"  {marca}", border=0, fill=True, align="L")
+                pdf.set_draw_color(220, 220, 220)
+                pdf.cell(col_widths[0], 7, f"  {nombre}", border="LR", fill=True, align="L")
+                pdf.cell(col_widths[1], 7, f"  {categoria}", border="LR", fill=True, align="L")
+                pdf.cell(col_widths[2], 7, f"  {marca}", border="LR", fill=True, align="L")
                 pdf.set_font("Helvetica", "B", 9)
-                pdf.cell(col_widths[3], 7, f"{precio_str}  ", border=0, fill=True, align="R")
+                pdf.cell(col_widths[3], 7, f"{precio_str}  ", border="LR", fill=True, align="R")
                 pdf.set_font("Helvetica", "", 9)
                 pdf.ln()
 
