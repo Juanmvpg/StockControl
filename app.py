@@ -1402,7 +1402,6 @@ class ILovePdfDialog(tk.Toplevel):
         self.geometry("450x250")
         self.configure(bg=BG)
         self.transient(parent)
-        self.grab_set()
 
         lbl_title = tk.Label(self, text="Convertir lista de precios PDF a Excel", bg=BG, fg=TEXT, font=("Segoe UI", 12, "bold"))
         lbl_title.pack(pady=15)
