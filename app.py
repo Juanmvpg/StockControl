@@ -2090,6 +2090,11 @@ class StockApp(tk.Tk):
                   background=[("selected", ACCENT)],
                   foreground=[("selected", TEXT)])
 
+        # Scrollbar
+        style.configure("Vertical.TScrollbar",
+                        background=BG3, troughcolor=BG,
+                        arrowcolor=TEXT_DIM, borderwidth=0)
+
     # ── Separadores de columna para Treeview ─────
     @staticmethod
     def _add_column_lines(tree, color="#3a3a3a"):
@@ -2119,11 +2124,6 @@ class StockApp(tk.Tk):
 
         tree.bind("<Configure>", lambda e: tree.after_idle(_update), add="+")
         tree.after(200, _update)
-
-        # Scrollbar
-        style.configure("Vertical.TScrollbar",
-                        background=BG3, troughcolor=BG,
-                        arrowcolor=TEXT_DIM, borderwidth=0)
 
     # ── Cabecera ─────────────────────────────────
 
