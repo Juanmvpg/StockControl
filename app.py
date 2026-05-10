@@ -1635,27 +1635,9 @@ class GenerarListaPdfDialog(tk.Toplevel):
             draw_table_header()
 
             # --- Filas de productos ---
-            pdf.set_font("Helvetica", "", 9)
-            current_group = None
-            group_field = "categoria" if orden == "categoria" else ("marca" if orden == "marca" else None)
+            pdf.set_font("Helvetica", "", 8)
 
             for idx, p in enumerate(productos):
-                # Separador de grupo si es por categoría o marca
-                if group_field:
-                    group_val = p.get(group_field) or ("Sin Categoría" if group_field == "categoria" else "Sin Marca")
-                    if group_val != current_group:
-                        current_group = group_val
-                        # Check page space
-                        if pdf.get_y() > 265:
-                            pdf.add_page()
-                            draw_table_header()
-                        pdf.set_fill_color(CAT_BG_R, CAT_BG_G, CAT_BG_B)
-                        pdf.set_text_color(255, 255, 255)
-                        pdf.set_font("Helvetica", "B", 10)
-                        pdf.set_draw_color(220, 220, 220)
-                        pdf.cell(page_w, 8, f"  {current_group}", border="LR", ln=True, fill=True)
-                        pdf.set_font("Helvetica", "", 9)
-
                 # Check page space
                 if pdf.get_y() > 272:
                     pdf.add_page()
@@ -1670,9 +1652,9 @@ class GenerarListaPdfDialog(tk.Toplevel):
 
                 pdf.set_text_color(33, 33, 33)
 
-                nombre = (p.get("nombre") or "")[:45]
-                categoria = (p.get("categoria") or "")[:20]
-                marca = (p.get("marca") or "")[:18]
+                nombre = (p.get("nombre") or "")[:65]
+                categoria = (p.get("categoria") or "")[:25]
+                marca = (p.get("marca") or "")[:25]
                 precio_val = p.get("precio") or 0
                 precio_str = f"${precio_val:,.2f}"
 
@@ -1680,9 +1662,9 @@ class GenerarListaPdfDialog(tk.Toplevel):
                 pdf.cell(col_widths[0], 7, f"  {nombre}", border="LR", fill=True, align="L")
                 pdf.cell(col_widths[1], 7, f"  {categoria}", border="LR", fill=True, align="L")
                 pdf.cell(col_widths[2], 7, f"  {marca}", border="LR", fill=True, align="L")
-                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_font("Helvetica", "B", 8)
                 pdf.cell(col_widths[3], 7, f"{precio_str}  ", border="LR", fill=True, align="R")
-                pdf.set_font("Helvetica", "", 9)
+                pdf.set_font("Helvetica", "", 8)
                 pdf.ln()
 
             # --- Pie de página ---
@@ -2338,7 +2320,7 @@ class StockApp(tk.Tk):
         self.tree_ed.pack(side="left", fill="both", expand=True)
         sb_ed.pack(side="right", fill="y")
 
-        self.tree_ed.bind("<Double-1>", lambda e: self._editar_producto_desde_tree_ed())
+        self.tree_ed.bind("<Double-1>", lambda e: self._editar_producto_desde_tree_ed() if self.tree_ed.identify_region(e.x, e.y) == "cell" else None)
         
         def _treeview_sort_column_ed(col_id, rev, is_sel_col=False):
             items = [(self.tree_ed.set(k, col_id), k) for k in self.tree_ed.get_children("")]
