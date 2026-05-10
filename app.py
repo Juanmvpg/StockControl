@@ -2090,6 +2090,36 @@ class StockApp(tk.Tk):
                   background=[("selected", ACCENT)],
                   foreground=[("selected", TEXT)])
 
+    # ── Separadores de columna para Treeview ─────
+    @staticmethod
+    def _add_column_lines(tree, color="#3a3a3a"):
+        """Agrega líneas verticales finas entre las columnas de un Treeview."""
+        separators = []
+
+        def _update(event=None):
+            tree.update_idletasks()
+            cols = tree["columns"]
+            # Calcular x acumulado para cada frontera de columna
+            x = 0
+            for i, col in enumerate(cols[:-1]):
+                w = tree.column(col, "width")
+                x += w
+                if i < len(separators):
+                    separators[i].place(x=x - 1, y=0, width=1, relheight=1.0)
+                else:
+                    sep = tk.Frame(tree, bg=color, width=1, cursor="")
+                    sep.place(x=x - 1, y=0, width=1, relheight=1.0)
+                    # Reenviar eventos al Treeview para no bloquear clics
+                    for ev in ("<Button-1>", "<Double-1>", "<ButtonRelease-1>",
+                               "<B1-Motion>", "<Shift-ButtonRelease-1>"):
+                        sep.bind(ev, lambda e, _ev=ev: tree.event_generate(
+                            _ev, x=e.x_root - tree.winfo_rootx(),
+                            y=e.y_root - tree.winfo_rooty()))
+                    separators.append(sep)
+
+        tree.bind("<Configure>", lambda e: tree.after_idle(_update), add="+")
+        tree.after(200, _update)
+
         # Scrollbar
         style.configure("Vertical.TScrollbar",
                         background=BG3, troughcolor=BG,
@@ -2319,6 +2349,7 @@ class StockApp(tk.Tk):
         self.tree_ed.configure(yscrollcommand=sb_ed.set)
         self.tree_ed.pack(side="left", fill="both", expand=True)
         sb_ed.pack(side="right", fill="y")
+        self._add_column_lines(self.tree_ed)
 
         self.tree_ed.bind("<Double-1>", lambda e: self._editar_producto_desde_tree_ed() if self.tree_ed.identify_region(e.x, e.y) == "cell" else None)
         
@@ -2851,6 +2882,7 @@ class StockApp(tk.Tk):
 
         self.tree.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
+        self._add_column_lines(self.tree)
 
         self.tree.bind("<Double-1>", self._on_tree_double_click)
         self.tree.bind("<ButtonRelease-1>", self._toggle_sel_prod)
