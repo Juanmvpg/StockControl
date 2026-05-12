@@ -611,6 +611,7 @@ class EvolucionPreciosDialog(tk.Toplevel):
         # Crear Treeview
         columns = ("producto", "precio_ant", "precio_nuev")
         self.tree = ttk.Treeview(frame, columns=columns, show="headings", height=10)
+        self.tree.bind("<Button-1>", lambda e: "break" if self.tree.identify_region(e.x, e.y) == "separator" else None)
         
         self.tree.heading("producto", text="Producto")
         self.tree.heading("precio_ant", text="Precio Anterior")
@@ -706,6 +707,7 @@ class AumentoMasivoDialog(tk.Toplevel):
             
             cols = ("prod", "precio_ant", "precio_new")
             self.tree_prev = ttk.Treeview(prev_frame, columns=cols, show="headings", height=8, selectmode="extended")
+            self.tree_prev.bind("<Button-1>", lambda e: "break" if self.tree_prev.identify_region(e.x, e.y) == "separator" else None)
             self.tree_prev.heading("prod", text="Producto")
             self.tree_prev.heading("precio_ant", text="Precio Actual")
             self.tree_prev.heading("precio_new", text="Nuevo Precio")
@@ -1006,6 +1008,7 @@ class SalidaMultipleDialog(tk.Toplevel):
         widths = (0, 200, 70, 90, 60, 60, 100, 90, 160)
 
         self.tree = ttk.Treeview(tree_frame, columns=cols, show="headings", selectmode="browse")
+        self.tree.bind("<Button-1>", lambda e: "break" if self.tree.identify_region(e.x, e.y) == "separator" else None)
         for col, hdr, w in zip(cols, headers, widths):
             self.tree.heading(col, text=hdr)
             self.tree.column(col, width=w, anchor="center" if col not in ("nombre", "nota") else "w")
@@ -2095,36 +2098,6 @@ class StockApp(tk.Tk):
                         background=BG3, troughcolor=BG,
                         arrowcolor=TEXT_DIM, borderwidth=0)
 
-    # ── Separadores de columna para Treeview ─────
-    @staticmethod
-    def _add_column_lines(tree, color="#3a3a3a"):
-        """Agrega líneas verticales finas entre las columnas de un Treeview."""
-        separators = []
-
-        def _update(event=None):
-            tree.update_idletasks()
-            cols = tree["columns"]
-            # Calcular x acumulado para cada frontera de columna
-            x = 0
-            for i, col in enumerate(cols[:-1]):
-                w = tree.column(col, "width")
-                x += w
-                if i < len(separators):
-                    separators[i].place(x=x - 1, y=0, width=1, relheight=1.0)
-                else:
-                    sep = tk.Frame(tree, bg=color, width=1, cursor="")
-                    sep.place(x=x - 1, y=0, width=1, relheight=1.0)
-                    # Reenviar eventos al Treeview para no bloquear clics
-                    for ev in ("<Button-1>", "<Double-1>", "<ButtonRelease-1>",
-                               "<B1-Motion>", "<Shift-ButtonRelease-1>"):
-                        sep.bind(ev, lambda e, _ev=ev: tree.event_generate(
-                            _ev, x=e.x_root - tree.winfo_rootx(),
-                            y=e.y_root - tree.winfo_rooty()))
-                    separators.append(sep)
-
-        tree.bind("<Configure>", lambda e: tree.after_idle(_update), add="+")
-        tree.after(200, _update)
-
     # ── Cabecera ─────────────────────────────────
 
     def _build_header(self, parent):
@@ -2349,7 +2322,6 @@ class StockApp(tk.Tk):
         self.tree_ed.configure(yscrollcommand=sb_ed.set)
         self.tree_ed.pack(side="left", fill="both", expand=True)
         sb_ed.pack(side="right", fill="y")
-        self._add_column_lines(self.tree_ed)
 
         self.tree_ed.bind("<Double-1>", lambda e: self._editar_producto_desde_tree_ed() if self.tree_ed.identify_region(e.x, e.y) == "cell" else None)
         
@@ -2882,7 +2854,6 @@ class StockApp(tk.Tk):
 
         self.tree.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
-        self._add_column_lines(self.tree)
 
         self.tree.bind("<Double-1>", self._on_tree_double_click)
         self.tree.bind("<ButtonRelease-1>", self._toggle_sel_prod)
@@ -3077,6 +3048,7 @@ class StockApp(tk.Tk):
         tree_frame.pack(fill="both", expand=True, padx=10, pady=(0, 8))
 
         self.tree_hist = ttk.Treeview(tree_frame, columns=cols_h, show="headings", selectmode="browse")
+        self.tree_hist.bind("<Button-1>", lambda e: "break" if self.tree_hist.identify_region(e.x, e.y) == "separator" else None)
         widths_h = (100, 110, 85, 180, 90, 55, 75, 30, 150)
         for col, hdr, w in zip(cols_h, hdrs_h, widths_h):
             self.tree_hist.heading(col, text=hdr)
@@ -3152,6 +3124,7 @@ class StockApp(tk.Tk):
         tree_frame.pack(fill="both", expand=True, padx=10, pady=(0, 8))
 
         self.tree_alertas = ttk.Treeview(tree_frame, columns=cols_a, show="headings", selectmode="browse")
+        self.tree_alertas.bind("<Button-1>", lambda e: "break" if self.tree_alertas.identify_region(e.x, e.y) == "separator" else None)
         widths_a = (100, 300, 160, 120, 120)
         for col, hdr, w in zip(cols_a, hdrs_a, widths_a):
             self.tree_alertas.heading(col, text=hdr)
@@ -3266,6 +3239,8 @@ class StockApp(tk.Tk):
     def _start_drag_sel_prod(self, event):
         tree = event.widget
         region = tree.identify_region(event.x, event.y)
+        if region == "separator":
+            return "break"
         if region == "cell":
             col = tree.identify_column(event.x)
             if col == "#1":
