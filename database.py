@@ -246,10 +246,12 @@ def aplicar_aumento_masivo(valor, tipo_aumento, categoria=None, marca=None, ids=
             
             if tipo_aumento == "porcentaje":
                 precio_nuevo = precio_ant + (precio_ant * valor / 100.0)
-                nota_mov = f"Aumento masivo: +{valor}%"
+                tipo_str = "Aumento" if valor >= 0 else "Baja"
+                nota_mov = f"{tipo_str} {abs(valor)}%, precio anterior: ${precio_ant:,.2f}, precio actual: ${precio_nuevo:,.2f}"
             else:
                 precio_nuevo = precio_ant + valor
-                nota_mov = f"Aumento masivo: +${valor:,.2f}"
+                tipo_str = "Aumento" if valor >= 0 else "Baja"
+                nota_mov = f"{tipo_str} ${abs(valor):,.2f}, precio anterior: ${precio_ant:,.2f}, precio actual: ${precio_nuevo:,.2f}"
                 
             # Actualizar producto
             conn.execute("UPDATE productos SET precio=? WHERE id=?", (precio_nuevo, pid))

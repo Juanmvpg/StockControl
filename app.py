@@ -661,7 +661,7 @@ class EvolucionPreciosDialog(tk.Toplevel):
 class AumentoMasivoDialog(tk.Toplevel):
     def __init__(self, parent, productos_seleccionados=None):
         super().__init__(parent)
-        self.title("Aumento Masivo de Precios")
+        self.title("Ajuste Masivo de Precios")
         self.configure(bg=BG2)
         self.bind("<Escape>", lambda e: self.destroy())
         self.resizable(False, False)
@@ -674,7 +674,7 @@ class AumentoMasivoDialog(tk.Toplevel):
         frame = tk.Frame(self, bg=BG2, padx=20, pady=16)
         frame.pack(fill="both", expand=True)
 
-        tk.Label(frame, text="Aumentar Precios", bg=BG2, fg=WARNING, font=("Segoe UI", 12, "bold")).grid(row=0, column=0, columnspan=2, pady=(0, 10))
+        tk.Label(frame, text="Ajustar Precios", bg=BG2, fg=WARNING, font=("Segoe UI", 12, "bold")).grid(row=0, column=0, columnspan=2, pady=(0, 10))
         
         self.lbl_sel_text = tk.Label(frame, text="", bg=BG2, fg=ACCENT, font=("Segoe UI", 9, "bold"))
         self.lbl_sel_text.grid(row=1, column=0, columnspan=2, pady=(0, 10))
@@ -839,13 +839,15 @@ class AumentoMasivoDialog(tk.Toplevel):
         tipo = self.v_tipo.get()
         
         if not self.productos_seleccionados and not self.v_check_cat.get() and not self.v_check_marca.get():
-            resp = messagebox.askyesno("Confirmar Aumento Global", "No ha seleccionado productos ni filtros. ¿Está seguro que desea aplicar un incremento a TODOS los productos del inventario?", icon="warning", parent=self)
+            resp = messagebox.askyesno("Confirmar Ajuste Global", "No ha seleccionado productos ni filtros. ¿Está seguro que desea aplicar un ajuste a TODOS los productos del inventario?", icon="warning", parent=self)
             if not resp: return
 
         simbolo = "%" if tipo == "porcentaje" else "$"
         post_simbolo = "" if tipo == "porcentaje" else " fijos"
         
-        msg = f"¿Está seguro de aplicar un aumento de {simbolo}{valor}{post_simbolo} "
+        tipo_accion = "un aumento" if valor >= 0 else "una baja"
+        valor_abs = abs(valor)
+        msg = f"¿Está seguro de aplicar {tipo_accion} de {simbolo}{valor_abs}{post_simbolo} "
         if self.productos_seleccionados:
             msg += f"\na los {len(self.productos_seleccionados)} productos seleccionados manualmente?"
         elif cat != "Cualquiera" and marca != "Cualquiera":
@@ -857,7 +859,7 @@ class AumentoMasivoDialog(tk.Toplevel):
         else:
             msg += f"\na TODOS los productos globalmente?"
 
-        resp = messagebox.askyesno("Confirmar Aumento", msg, icon="warning", parent=self)
+        resp = messagebox.askyesno("Confirmar Ajuste", msg, icon="warning", parent=self)
         if resp:
             ids_to_update = [p["id"] for p in self.productos_seleccionados]
             cambios = db.aplicar_aumento_masivo(valor, tipo, cat, marca, ids_to_update)
