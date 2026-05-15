@@ -121,6 +121,11 @@ class ProductoDialog(tk.Toplevel):
                 self.cmb_cat.grid(row=i, column=1, sticky="ew", pady=5)
             elif label_txt == "Marca":
                 self.cmb_marca.grid(row=i, column=1, sticky="ew", pady=5)
+            elif label_txt == "Código *":
+                code_frame = tk.Frame(frame, bg=BG2)
+                code_frame.grid(row=i, column=1, sticky="ew", pady=5)
+                entry(code_frame, textvariable=var, width=16).pack(side="left", fill="x", expand=True)
+                styled_btn(code_frame, "⚡", self._autogenerar_codigo, color="#2563eb", width=3).pack(side="left", padx=(5, 0))
             else:
                 entry(frame, textvariable=var, width=28).grid(row=i, column=1, sticky="ew", pady=5)
 
@@ -144,6 +149,17 @@ class ProductoDialog(tk.Toplevel):
         styled_btn(btn_frame, "✖ Cancelar", self.destroy, color=BG3).pack(side="left", padx=6)
 
         self.wait_window()
+
+    def _autogenerar_codigo(self):
+        try:
+            conn = db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT codigo FROM productos")
+            codigos = [row[0] for row in cursor.fetchall() if row[0] and row[0].isdigit()]
+            siguiente = max(map(int, codigos)) + 1 if codigos else 1
+            self.v_codigo.set(str(siguiente))
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo generar el código: {e}", parent=self)
 
     def _guardar(self):
         codigo    = self.v_codigo.get().strip()
