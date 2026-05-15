@@ -875,108 +875,7 @@ class AumentoMasivoDialog(tk.Toplevel):
             else:
                 messagebox.showinfo("Resultado", "No se encontraron productos que coincidan con el criterio para aumentar.")
 
-class FraccionarDialog(tk.Toplevel):
-    def __init__(self, parent, prod_origen):
-        super().__init__(parent)
-        self.title("Fraccionar Producto")
-        self.geometry("600x400")
-        self.minsize(550, 350)
-        self.configure(bg=BG2)
-        self.bind("<Escape>", lambda e: self.destroy())
-        self.grab_set()
 
-        self.resultado = False
-        self.prod_origen = prod_origen
-
-        frame = tk.Frame(self, bg=BG2, padx=20, pady=16)
-        frame.pack(fill="both", expand=True)
-
-        tk.Label(frame, text="Fraccionar Empaque", bg=BG2, fg=ACCENT, font=("Segoe UI", 12, "bold")).grid(row=0, column=0, columnspan=2, pady=(0, 10))
-        tk.Label(frame, text=f"Origen: {prod_origen['nombre']}\nStock actual: {fmt_qty(prod_origen['stock'])}", bg=BG2, fg=TEXT, font=("Segoe UI", 9)).grid(row=1, column=0, columnspan=2, pady=(0, 10))
-
-        self.v_destino_id = tk.StringVar()
-        self.v_cant_origen = tk.StringVar(value="1")
-        self.v_cant_destino = tk.StringVar(value="")
-
-        tk.Label(frame, text="Producto Destino", bg=BG2, fg=TEXT_DIM, font=("Segoe UI", 9)).grid(row=2, column=0, sticky="w", pady=5)
-        
-        self.productos = db.get_productos()
-        self.productos_opts = [p for p in self.productos if p["id"] != prod_origen["id"]]
-        
-        if not self.productos_opts:
-            messagebox.showerror("Error", "No hay otros productos para usar como destino.", parent=self)
-            self.destroy()
-            return
-            
-        nombres_destino = [f"{p['codigo']} - {p['nombre']}" for p in self.productos_opts]
-        self.nombres_destino = nombres_destino
-        
-        self.cmb_destino = ttk.Combobox(frame, width=55)
-        self.cmb_destino["values"] = self.nombres_destino
-        self.cmb_destino.grid(row=2, column=1, sticky="w", pady=5, padx=(10, 0))
-
-        def _on_keyrelease(event):
-            value = event.widget.get()
-            if value == '':
-                self.cmb_destino['values'] = self.nombres_destino
-            else:
-                data = [item for item in self.nombres_destino if value.lower() in item.lower()]
-                self.cmb_destino['values'] = data
-
-        self.cmb_destino.bind('<KeyRelease>', _on_keyrelease)
-
-        tk.Label(frame, text="Cantidad a descontar\ndel origen (Ej. 1 bolsa)", bg=BG2, fg=TEXT_DIM, font=("Segoe UI", 9)).grid(row=3, column=0, sticky="w", pady=5)
-        entry(frame, textvariable=self.v_cant_origen, width=15).grid(row=3, column=1, sticky="w", pady=5, padx=(10, 0))
-
-        tk.Label(frame, text="Cantidad a sumar\nal destino (Ej. 20 Kg)", bg=BG2, fg=TEXT_DIM, font=("Segoe UI", 9)).grid(row=4, column=0, sticky="w", pady=5)
-        entry(frame, textvariable=self.v_cant_destino, width=15).grid(row=4, column=1, sticky="w", pady=5, padx=(10, 0))
-
-        btn_frame = tk.Frame(frame, bg=BG2)
-        btn_frame.grid(row=5, column=0, columnspan=2, pady=(16, 0))
-
-        styled_btn(btn_frame, "✔ Fraccionar", self._confirmar, color=SUCCESS).pack(side="left", padx=6)
-        styled_btn(btn_frame, "✖ Cancelar", self.destroy, color=BG3).pack(side="left", padx=6)
-
-        self.wait_window()
-
-    def _confirmar(self):
-        seleccion = self.cmb_destino.get()
-        idx = -1
-        for i, nombre in enumerate(self.nombres_destino):
-            if nombre == seleccion:
-                idx = i
-                break
-
-        if idx < 0:
-            messagebox.showerror("Error", "Seleccione un producto de destino válido de la lista.", parent=self)
-            return
-            
-        prod_destino = self.productos_opts[idx]
-        
-        try:
-            cant_origen = float(self.v_cant_origen.get().replace(",", "."))
-            cant_destino = float(self.v_cant_destino.get().replace(",", "."))
-            if cant_origen <= 0 or cant_destino <= 0:
-                raise ValueError
-        except ValueError:
-            messagebox.showerror("Error", "Ingrese cantidades numéricas mayores a 0.", parent=self)
-            return
-
-        if self.prod_origen["stock"] < cant_origen:
-            resp = messagebox.askyesno("Stock Insuficiente", f"El stock de origen ({fmt_qty(self.prod_origen['stock'])}) es menor a la cantidad a descontar ({fmt_qty(cant_origen)}).\n¿Forzar fraccionamiento?", icon="warning", parent=self)
-            if not resp:
-                return
-            forzar = True
-        else:
-            forzar = False
-
-        try:
-            db.fraccionar_producto(self.prod_origen["id"], prod_destino["id"], cant_origen, cant_destino, forzar)
-            self.resultado = True
-            messagebox.showinfo("Éxito", "Producto fraccionado correctamente.", parent=self)
-            self.destroy()
-        except ValueError as e:
-            messagebox.showerror("Error", str(e), parent=self)
 
 class SalidaMultipleDialog(tk.Toplevel):
     def __init__(self, parent, productos_seleccionados):
@@ -2217,7 +2116,6 @@ class StockApp(tk.Tk):
         b_nuevo      = styled_btn(btn_frame, "+ Nuevo Producto", self._nuevo_producto,    color=SUCCESS, width=16)
         b_editar     = styled_btn(btn_frame, "✎ Editar Prod.",    self._editar_producto,   color=ACCENT,  width=16)
         b_aumento    = styled_btn(btn_frame, "📈 Precios",        self._abrir_aumento,     color=WARNING, width=16)
-        b_fraccionar = styled_btn(btn_frame, "🔀 Fraccionar",     self._fraccionar_producto, color=ACCENT, width=16)
         b_eliminar   = styled_btn(btn_frame, "🗑 Eliminar",        self._eliminar_producto, color="#8b3a3a", width=16)
         # 1. Empacar PRIMERO los botones de la derecha para evitar que se recorten por falta de espacio
         # (se empacan en orden inverso porque pack(side="right") los apila hacia la izquierda)
@@ -2259,7 +2157,6 @@ class StockApp(tk.Tk):
         b_nuevo.pack(side="left", padx=6)
         b_editar.pack(side="left", padx=6)
         b_aumento.pack(side="left", padx=6)
-        b_fraccionar.pack(side="left", padx=6)
 
         tk.Frame(btn_frame, width=10, bg=BG).pack(side="left")  # Separador
         b_entrada = styled_btn(btn_frame, "▲ Entrada", self._entrada_stock, color="#4fa882", width=12)
@@ -2416,7 +2313,7 @@ class StockApp(tk.Tk):
         self.tree_ed.bind("<F2>", _on_tree_ed_f2)
 
         # Guardar referencias para controlar con el lock
-        self._btns_edicion = [b_nuevo, b_editar, b_aumento, b_fraccionar, b_eliminar, mb_datos, b_entrada]
+        self._btns_edicion = [b_nuevo, b_editar, b_aumento, b_eliminar, mb_datos, b_entrada]
         self._aplicar_estado_edicion()
 
     # ── MÉTODOS MODO STOCK RÁPIDO ─────────────────────────
@@ -3953,16 +3850,7 @@ class StockApp(tk.Tk):
             if hasattr(self, 'refresh_tab_edicion'):
                 self.refresh_tab_edicion()
 
-    def _fraccionar_producto(self):
-        prod = self._get_selected_producto()
-        if not prod:
-            messagebox.showwarning("Seleccione Producto", "Debe seleccionar un producto para fraccionar.")
-            return
 
-        dlg = FraccionarDialog(self, prod)
-        if getattr(dlg, "resultado", False):
-            self.refresh_productos()
-            self.refresh_historial()
 
     def _get_selected_productos_ids(self):
         """Devuelve una lista de IDs de las selecciones explícitas, o fallback en Historial/Productos."""

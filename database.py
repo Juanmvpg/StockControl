@@ -315,27 +315,7 @@ def get_incremental_order():
 #  Importación Masiva (Merge)
 # ──────────────────────────────────────────────
 
-def fraccionar_producto(origen_id, destino_id, cant_origen, cant_destino, forzar=False):
-    """Saca stock de origen e ingresa en destino, linkeando la operación por notas."""
-    with get_connection() as conn:
-        if not forzar:
-            row = conn.execute("SELECT stock FROM productos WHERE id=?", (origen_id,)).fetchone()
-            if not row or row["stock"] < cant_origen:
-                raise ValueError("Stock en origen insuficiente para fraccionar.")
-                
-        # Register salida for origin
-        conn.execute(
-            "INSERT INTO movimientos (producto_id,tipo,cantidad,nota,forzado,precio,grupo_id) VALUES (?,?,?,?,?,?,?)",
-            (origen_id, "salida", cant_origen, "Fraccionamiento (Baja)", 1 if forzar else 0, 0.0, None)
-        )
-        conn.execute("UPDATE productos SET stock=stock-? WHERE id=?", (cant_origen, origen_id))
 
-        # Register entrada for destination
-        conn.execute(
-            "INSERT INTO movimientos (producto_id,tipo,cantidad,nota,forzado,precio,grupo_id) VALUES (?,?,?,?,?,?,?)",
-            (destino_id, "entrada", cant_destino, "Fraccionamiento (Alta)", 0, None, None)
-        )
-        conn.execute("UPDATE productos SET stock=stock+? WHERE id=?", (cant_destino, destino_id))
 
 
 def eliminar_producto(pid):
