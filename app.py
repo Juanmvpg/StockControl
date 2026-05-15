@@ -838,9 +838,13 @@ class AumentoMasivoDialog(tk.Toplevel):
         marca = self.v_marca.get() if self.v_check_marca.get() else "Cualquiera"
         tipo = self.v_tipo.get()
         
-        if not self.productos_seleccionados and not self.v_check_cat.get() and not self.v_check_marca.get():
-            resp = messagebox.askyesno("Confirmar Ajuste Global", "No ha seleccionado productos ni filtros. ¿Está seguro que desea aplicar un ajuste a TODOS los productos del inventario?", icon="warning", parent=self)
-            if not resp: return
+        is_global = not self.productos_seleccionados and cat == "Cualquiera" and marca == "Cualquiera"
+        if is_global:
+            # Check if explicitly authorized by checking both boxes and selecting "Cualquiera"
+            authorized = self.v_check_cat.get() and self.v_check_marca.get()
+            if not authorized:
+                messagebox.showerror("Ajuste Global Bloqueado", "Para aplicar un ajuste a TODOS los productos, debe activar las casillas de filtro para Categoría y Marca, dejándolas en 'Cualquiera'.", parent=self)
+                return
 
         simbolo = "%" if tipo == "porcentaje" else "$"
         post_simbolo = "" if tipo == "porcentaje" else " fijos"
