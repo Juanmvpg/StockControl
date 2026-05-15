@@ -483,6 +483,23 @@ def exportar_excel(filepath):
     if not productos:
         return 0
     df = pd.DataFrame(productos)
+    cols_to_drop = [col for col in ['id', 'activo'] if col in df.columns]
+    if cols_to_drop:
+        df = df.drop(columns=cols_to_drop)
+    
+    df = df.rename(columns={
+        'codigo': 'Código',
+        'nombre': 'Nombre',
+        'categoria': 'Categoría',
+        'marca': 'Marca',
+        'stock': 'Stock',
+        'minimo': 'Stock Mínimo',
+        'precio': 'Precio Venta',
+        'precio_costo': 'Precio Costo',
+        'por_peso': 'Se vende por peso',
+        'nota': 'Nota'
+    })
+    
     df.to_excel(filepath, index=False)
     return len(productos)
 
