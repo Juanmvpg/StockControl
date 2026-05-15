@@ -2397,7 +2397,7 @@ class StockApp(tk.Tk):
         entry.place(x=x, y=y, width=w, height=h)
         self._stock_entry_active = entry
         
-        val_limpio = val_actual.replace(' kg', '')
+        val_limpio = val_actual.replace(' Kg', '').replace(' kg', '').strip()
         entry.delete(0, tk.END)
         entry.insert(0, val_limpio)
         entry.select_range(0, tk.END)
@@ -2406,7 +2406,7 @@ class StockApp(tk.Tk):
         def validate_and_save(e=None, nav=None):
             if not getattr(self, '_stock_entry_active', None) or not entry.winfo_exists(): return "break"
             
-            nuevo_texto = entry.get().strip()
+            nuevo_texto = entry.get().replace(' Kg', '').replace(' kg', '').strip()
             try:
                 if nuevo_texto == "": nuevo_val = 0.0
                 else: nuevo_val = float(nuevo_texto)
