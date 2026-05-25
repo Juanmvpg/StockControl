@@ -15,10 +15,18 @@ else:
 
 DB_FILE = base_dir / "stock.db"
 
+import unicodedata
+
+def unaccent_lower(text):
+    if text is None: return None
+    s = str(text).lower()
+    return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+
 def get_connection():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.create_function("unaccent_lower", 1, unaccent_lower)
     return conn
 
 
@@ -87,9 +95,9 @@ def get_productos(filtro=""):
     """Devuelve todos los productos; filtra por código/nombre/categoría."""
     with get_connection() as conn:
         if filtro:
-            like = f"%{filtro}%"
+            like = f"%{unaccent_lower(filtro)}%"
             rows = conn.execute(
-                "SELECT * FROM productos WHERE activo=1 AND (codigo LIKE ? OR nombre LIKE ? OR categoria LIKE ? OR marca LIKE ?) ORDER BY nombre",
+                "SELECT * FROM productos WHERE activo=1 AND (unaccent_lower(codigo) LIKE ? OR unaccent_lower(nombre) LIKE ? OR unaccent_lower(categoria) LIKE ? OR unaccent_lower(marca) LIKE ?) ORDER BY nombre",
                 (like, like, like, like)
             ).fetchall()
         else:
@@ -213,6 +221,8 @@ def actualizar_nota_producto(pid, nota):
     with get_connection() as conn:
         conn.execute("UPDATE productos SET nota=? WHERE id=?", (nota, pid))
 
+from decimal import Decimal, ROUND_UP, ROUND_DOWN
+
 def aplicar_aumento_masivo(valor, tipo_aumento, categoria=None, marca=None, ids=None):
     """
     valor: float (monto o porcentaje)
@@ -242,27 +252,75 @@ def aplicar_aumento_masivo(valor, tipo_aumento, categoria=None, marca=None, ids=
         for p in productos_afectados:
             pid = p["id"]
             nombre = p["nombre"]
-            precio_ant = p["precio"]
+            precio_ant = Decimal(str(p["precio"] or 0))
+            val_dec = Decimal(str(valor))
             
             if tipo_aumento == "porcentaje":
-                precio_nuevo = precio_ant + (precio_ant * valor / 100.0)
+                precio_nuevo = precio_ant + (precio_ant * val_dec / Decimal('100'))
                 tipo_str = "Aumento" if valor >= 0 else "Baja"
-                nota_mov = f"{tipo_str} {abs(valor)}%, precio anterior: ${precio_ant:,.2f}, precio actual: ${precio_nuevo:,.2f}"
+                nota_mov = f"{tipo_str} {abs(valor)}%, precio anterior: ${float(precio_ant):,.2f}, precio actual: ${float(precio_nuevo):,.2f}"
             else:
-                precio_nuevo = precio_ant + valor
+                precio_nuevo = precio_ant + val_dec
                 tipo_str = "Aumento" if valor >= 0 else "Baja"
-                nota_mov = f"{tipo_str} ${abs(valor):,.2f}, precio anterior: ${precio_ant:,.2f}, precio actual: ${precio_nuevo:,.2f}"
+                nota_mov = f"{tipo_str} ${abs(valor):,.2f}, precio anterior: ${float(precio_ant):,.2f}, precio actual: ${float(precio_nuevo):,.2f}"
                 
             # Actualizar producto
-            conn.execute("UPDATE productos SET precio=? WHERE id=?", (precio_nuevo, pid))
+            conn.execute("UPDATE productos SET precio=? WHERE id=?", (float(precio_nuevo), pid))
             
             # Registrar en historial (movimientos) como cantidad 0 para dejar rastro de cambio de precio
             conn.execute(
                 "INSERT INTO movimientos (producto_id, tipo, cantidad, nota, forzado, precio, grupo_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (pid, "entrada", 0, nota_mov, 0, precio_nuevo, None)
+                (pid, "entrada", 0, nota_mov, 0, float(precio_nuevo), None)
             )
             
-            cambios.append((nombre, precio_ant, precio_nuevo))
+            cambios.append((nombre, float(precio_ant), float(precio_nuevo)))
+            
+        conn.commit()
+    return cambios
+
+def redondear_precios_masivo(ids=None, direccion="arriba", categoria=None, marca=None):
+    cambios = []
+    with get_connection() as conn:
+        query_sel = "SELECT id, nombre, precio FROM productos WHERE 1=1"
+        params = []
+        if ids is not None and len(ids) > 0:
+            placeholders = ",".join(["?"] * len(ids))
+            query_sel += f" AND id IN ({placeholders})"
+            params.extend(ids)
+        else:
+            if categoria and categoria != "Cualquiera":
+                query_sel += " AND categoria=?"
+                params.append(categoria)
+            if marca and marca != "Cualquiera":
+                query_sel += " AND marca=?"
+                params.append(marca)
+                
+        productos_afectados = conn.execute(query_sel, tuple(params)).fetchall()
+        
+        for p in productos_afectados:
+            pid = p["id"]
+            nombre = p["nombre"]
+            precio_ant = Decimal(str(p["precio"] or 0))
+            
+            if direccion == "arriba":
+                precio_nuevo = precio_ant.quantize(Decimal('1'), rounding=ROUND_UP)
+            else:
+                precio_nuevo = precio_ant.quantize(Decimal('1'), rounding=ROUND_DOWN)
+                
+            if precio_nuevo == precio_ant:
+                continue
+                
+            precio_nuevo_float = float(precio_nuevo)
+            precio_ant_float = float(precio_ant)
+            
+            nota_mov = f"Redondeo ({direccion}), precio anterior: ${precio_ant_float:,.2f}, precio actual: ${precio_nuevo_float:,.2f}"
+            
+            conn.execute("UPDATE productos SET precio=? WHERE id=?", (precio_nuevo_float, pid))
+            conn.execute(
+                "INSERT INTO movimientos (producto_id, tipo, cantidad, nota, forzado, precio, grupo_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (pid, "entrada", 0, nota_mov, 0, precio_nuevo_float, None)
+            )
+            cambios.append((nombre, precio_ant_float, precio_nuevo_float))
             
         conn.commit()
     return cambios

@@ -1,3 +1,4 @@
+import logging
 """
 app.py – Interfaz gráfica principal (Tkinter)
 Control de Stock v1.0
@@ -377,8 +378,7 @@ class MovimientoDialog(tk.Toplevel):
         except (ValueError, AttributeError):
             try:
                 self.lbl_ref_info.config(text="", fg=SUCCESS)
-            except Exception:
-                pass
+            except Exception as e: logging.exception("Error silencioso capturado:")
         finally:
             self._actualizando = False
 
@@ -397,8 +397,7 @@ class MovimientoDialog(tk.Toplevel):
         except (ValueError, AttributeError):
             try:
                 self.lbl_ref_info.config(text="", fg=SUCCESS)
-            except Exception:
-                pass
+            except Exception as e: logging.exception("Error silencioso capturado:")
         finally:
             self._actualizando = False
 
@@ -2157,6 +2156,8 @@ class StockApp(tk.Tk):
         b_nuevo.pack(side="left", padx=6)
         b_editar.pack(side="left", padx=6)
         b_aumento.pack(side="left", padx=6)
+        b_redondeo_up.pack(side="left", padx=2)
+        b_redondeo_dn.pack(side="left", padx=2)
 
         tk.Frame(btn_frame, width=10, bg=BG).pack(side="left")  # Separador
         b_entrada = styled_btn(btn_frame, "▲ Entrada", self._entrada_stock, color="#4fa882", width=12)
@@ -2313,7 +2314,7 @@ class StockApp(tk.Tk):
         self.tree_ed.bind("<F2>", _on_tree_ed_f2)
 
         # Guardar referencias para controlar con el lock
-        self._btns_edicion = [b_nuevo, b_editar, b_aumento, b_eliminar, mb_datos, b_entrada]
+        self._btns_edicion = [b_nuevo, b_editar, b_aumento, b_redondeo_up, b_redondeo_dn, b_eliminar, mb_datos, b_entrada]
         self._aplicar_estado_edicion()
 
     # ── MÉTODOS MODO STOCK RÁPIDO ─────────────────────────
@@ -2336,7 +2337,7 @@ class StockApp(tk.Tk):
             # Desactivar botones momentaneamente
             for btn in self._btns_edicion:
                 try: btn.config(state="disabled")
-                except: pass
+                except Exception as e: logging.exception("Error silencioso genérico capturado:")
                 
             messagebox.showinfo("Stock Rápido Activado", "Haz clic en cualquier celda de la columna de STOCK para editarla.\nTus cambios no se guardarán en DB hasta que des a 'Confirmar'.\n\n- Presiona 'Tab' después de editar para pasar al producto de abajo.\n- Usa 'Ctrl+Z' para deshacer cambios individuales temporalmente.", parent=self)
         else:
@@ -2375,7 +2376,7 @@ class StockApp(tk.Tk):
         if hasattr(self, '_stock_entry_active') and self._stock_entry_active:
             try:
                 self._stock_entry_active.destroy()
-            except Exception: pass
+            except Exception as e: logging.exception("Error silencioso capturado:")
             self._stock_entry_active = None
 
         if delay:
@@ -2386,8 +2387,15 @@ class StockApp(tk.Tk):
             self._crear_entry_stock(iid)
 
     def _crear_entry_stock(self, iid):
-        val_actual = self.tree_ed.set(iid, "stock")
         prod_id = iid # El iid de la fila ES el id de la base de datos
+        
+        prod_data = db.get_producto_by_id(prod_id)
+        if prod_data:
+            val_limpio = str(prod_data.get("stock", 0))
+            if val_limpio.endswith(".0"):
+                val_limpio = val_limpio[:-2]
+        else:
+            val_limpio = "0"
         
         bbox = self.tree_ed.bbox(iid, "#6")
         if not bbox: return
@@ -2396,8 +2404,6 @@ class StockApp(tk.Tk):
         entry = ttk.Entry(self.tree_ed, font=("Segoe UI", 10), justify="center")
         entry.place(x=x, y=y, width=w, height=h)
         self._stock_entry_active = entry
-        
-        val_limpio = val_actual.replace(' Kg', '').replace(' kg', '').strip()
         entry.delete(0, tk.END)
         entry.insert(0, val_limpio)
         entry.select_range(0, tk.END)
@@ -2439,13 +2445,13 @@ class StockApp(tk.Tk):
             self.tree_ed.item(iid, tags=("seleccionado",))
 
             try: entry.destroy()
-            except Exception: pass
+            except Exception as e: logging.exception("Error silencioso capturado:")
             self._stock_entry_active = None
             
             # Desvincular el evento global de clic si existiera
             if hasattr(self, '_stock_click_bg_bind'):
                 try: self.tree_ed.unbind("<Button-1>", self._stock_click_bg_bind)
-                except Exception: pass
+                except Exception as e: logging.exception("Error silencioso capturado:")
                 delattr(self, '_stock_click_bg_bind')
 
             if nav:
@@ -2467,11 +2473,11 @@ class StockApp(tk.Tk):
 
         def cancel(e=None):
             try: entry.destroy()
-            except Exception: pass
+            except Exception as e: logging.exception("Error silencioso capturado:")
             self._stock_entry_active = None
             if hasattr(self, '_stock_click_bg_bind'):
                 try: self.tree_ed.unbind("<Button-1>", self._stock_click_bg_bind)
-                except Exception: pass
+                except Exception as e: logging.exception("Error silencioso capturado:")
                 delattr(self, '_stock_click_bg_bind')
 
         def on_tree_click_bg(e):
@@ -2521,7 +2527,7 @@ class StockApp(tk.Tk):
             i_idx = self.tree_ed.index(iid)
             tag = "alt" if i_idx % 2 != 0 else ""
             self.tree_ed.item(iid, tags=(tag,))
-        except Exception: pass
+        except Exception as e: logging.exception("Error silencioso capturado:")
         return "break"
 
     def _confirmar_stock_masivo(self):
@@ -2574,7 +2580,7 @@ class StockApp(tk.Tk):
     def _cancelar_stock_masivo(self):
         if hasattr(self, '_stock_click_bg_bind'):
             try: self.tree_ed.unbind("<Button-1>", self._stock_click_bg_bind)
-            except Exception: pass
+            except Exception as e: logging.exception("Error silencioso capturado:")
             delattr(self, '_stock_click_bg_bind')
             
         if self._cambios_stock_tmp:
@@ -2585,7 +2591,7 @@ class StockApp(tk.Tk):
         if getattr(self, '_stock_entry_active', None):
             try:
                 self._stock_entry_active.destroy()
-            except Exception: pass
+            except Exception as e: logging.exception("Error silencioso capturado:")
             self._stock_entry_active = None
 
         self._modo_stock_rapido = False
@@ -3230,7 +3236,7 @@ class StockApp(tk.Tk):
                             tree.focus_set()
                             tree.focus(iid)
                             tree.selection_set(iid)
-                        except Exception: pass
+                        except Exception as e: logging.exception("Error silencioso capturado:")
                     elif getattr(self, "tree_ed", None) and tree == self.tree_ed:
                         if iid in self._seleccionados:
                             self._seleccionados.remove(iid)
@@ -3244,7 +3250,7 @@ class StockApp(tk.Tk):
                                 tree.focus_set()
                                 tree.focus(iid)
                                 tree.selection_set(iid)
-                            except Exception: pass
+                            except Exception as e: logging.exception("Error silencioso capturado:")
 
 
     def _shift_toggle_sel_prod(self, event):
@@ -3846,6 +3852,30 @@ class StockApp(tk.Tk):
         productos = [db.get_producto_by_id(pid) for pid in ids]
         dlg = AumentoMasivoDialog(self, productos_seleccionados=productos)
         if getattr(dlg, "resultado", False):
+            self.refresh_productos()
+            if hasattr(self, 'refresh_tab_edicion'):
+                self.refresh_tab_edicion()
+
+    def _redondear_up(self):
+        ids = self._get_selected_productos_ids()
+        if not ids:
+            messagebox.showwarning("Atención", "Debe seleccionar al menos un producto para redondear.")
+            return
+        if messagebox.askyesno("Confirmar", f"¿Seguro que desea redondear hacia ARRIBA los {len(ids)} productos seleccionados?"):
+            db.redondear_precios_masivo(ids=ids, direccion="arriba")
+            messagebox.showinfo("Éxito", "Precios redondeados hacia arriba.")
+            self.refresh_productos()
+            if hasattr(self, 'refresh_tab_edicion'):
+                self.refresh_tab_edicion()
+
+    def _redondear_dn(self):
+        ids = self._get_selected_productos_ids()
+        if not ids:
+            messagebox.showwarning("Atención", "Debe seleccionar al menos un producto para redondear.")
+            return
+        if messagebox.askyesno("Confirmar", f"¿Seguro que desea redondear hacia ABAJO los {len(ids)} productos seleccionados?"):
+            db.redondear_precios_masivo(ids=ids, direccion="abajo")
+            messagebox.showinfo("Éxito", "Precios redondeados hacia abajo.")
             self.refresh_productos()
             if hasattr(self, 'refresh_tab_edicion'):
                 self.refresh_tab_edicion()
