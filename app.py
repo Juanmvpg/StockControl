@@ -713,26 +713,11 @@ class AumentoMasivoDialog(tk.Toplevel):
         entry_calc = entry(frame, textvariable=self.v_valor, width=15)
         entry_calc.grid(row=5, column=1, sticky="w", pady=5, padx=(10, 0))
 
-        # --- Sección de Redondeo (No Invasiva) ---
-        round_frame = tk.Frame(frame, bg=BG2)
-        round_frame.grid(row=6, column=0, columnspan=2, pady=(15, 5))
-        
-        tk.Label(round_frame, text="Redondear", bg=BG2, fg=TEXT_DIM, font=("Segoe UI", 9, "bold")).pack(anchor="center")
-        
-        btn_round_box = tk.Frame(round_frame, bg=BG2)
-        btn_round_box.pack(pady=2)
-        
-        b_round_up = styled_btn(btn_round_box, " ⬆ ", self._redondear_up_dialog, color="#a35fcc", width=6)
-        b_round_up.pack(side="left", padx=4)
-        
-        b_round_dn = styled_btn(btn_round_box, " ⬇ ", self._redondear_dn_dialog, color="#a35fcc", width=6)
-        b_round_dn.pack(side="left", padx=4)
-
         # --- Previsualización (Solo si se seleccionaron manualmente) ---
         self.tree_prev = None
         if self.productos_seleccionados:
             prev_frame = tk.Frame(frame, bg=BG)
-            prev_frame.grid(row=7, column=0, columnspan=2, pady=(15, 0), sticky="nsew")
+            prev_frame.grid(row=6, column=0, columnspan=2, pady=(15, 0), sticky="nsew")
             tk.Label(prev_frame, text="Previsualización de Impacto [Suprimir/Backspace para Remover]", bg=BG, fg=TEXT_DIM, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=5, pady=2)
             
             cols = ("prod", "precio_ant", "precio_new")
@@ -770,7 +755,7 @@ class AumentoMasivoDialog(tk.Toplevel):
             self.tree_prev.bind("<Delete>", _remove_selected)
 
         btn_frame = tk.Frame(frame, bg=BG2)
-        btn_frame.grid(row=8, column=0, columnspan=2, pady=(20, 0))
+        btn_frame.grid(row=7, column=0, columnspan=2, pady=(20, 0))
 
         styled_btn(btn_frame, "✔ Aplicar", self._aplicar, color=WARNING).pack(side="left", padx=6)
         styled_btn(btn_frame, "✖ Cancelar", self.destroy, color=BG3).pack(side="left", padx=6)
@@ -889,46 +874,7 @@ class AumentoMasivoDialog(tk.Toplevel):
             else:
                 messagebox.showinfo("Resultado", "No se encontraron productos que coincidan con el criterio para aumentar.")
 
-    def _redondear_dialog(self, direccion):
-        cat = self.v_cat.get() if self.v_check_cat.get() else "Cualquiera"
-        marca = self.v_marca.get() if self.v_check_marca.get() else "Cualquiera"
-        ids_to_update = [p["id"] for p in self.productos_seleccionados]
-        
-        is_global = not self.productos_seleccionados and cat == "Cualquiera" and marca == "Cualquiera"
-        if is_global:
-            authorized = self.v_check_cat.get() and self.v_check_marca.get()
-            if not authorized:
-                messagebox.showerror("Redondeo Global Bloqueado", "Para aplicar el redondeo a TODOS los productos, debe activar las casillas de filtro para Categoría y Marca, dejándolas en 'Cualquiera'.", parent=self)
-                return
-                
-        dir_str = "ARRIBA" if direccion == "arriba" else "ABAJO"
-        msg = f"¿Está seguro de redondear hacia {dir_str} "
-        if self.productos_seleccionados:
-            msg += f"\nlos {len(self.productos_seleccionados)} productos seleccionados manualmente?"
-        elif cat != "Cualquiera" and marca != "Cualquiera":
-            msg += f"\nlos productos de categoría '{cat}' y marca '{marca}'?"
-        elif cat != "Cualquiera":
-            msg += f"\nlos productos de la categoría '{cat}'?"
-        elif marca != "Cualquiera":
-            msg += f"\nlos productos de la marca '{marca}'?"
-        else:
-            msg += f"\nTODOS los productos globalmente?"
 
-        resp = messagebox.askyesno("Confirmar Redondeo", msg, icon="warning", parent=self)
-        if resp:
-            cambios = db.redondear_precios_masivo(ids=ids_to_update, direccion=direccion, categoria=cat, marca=marca)
-            if cambios:
-                messagebox.showinfo("Éxito", f"Se han redondeado {len(cambios)} precios hacia {direccion}.", parent=self)
-            else:
-                messagebox.showinfo("Aviso", "No se encontraron precios para redondear.", parent=self)
-            self.resultado = True
-            self.destroy()
-
-    def _redondear_up_dialog(self):
-        self._redondear_dialog("arriba")
-
-    def _redondear_dn_dialog(self):
-        self._redondear_dialog("abajo")
 
 
 
@@ -3910,29 +3856,7 @@ class StockApp(tk.Tk):
             if hasattr(self, 'refresh_tab_edicion'):
                 self.refresh_tab_edicion()
 
-    def _redondear_up(self):
-        ids = self._get_selected_productos_ids()
-        if not ids:
-            messagebox.showwarning("Atención", "Debe seleccionar al menos un producto para redondear.")
-            return
-        if messagebox.askyesno("Confirmar", f"¿Seguro que desea redondear hacia ARRIBA los {len(ids)} productos seleccionados?"):
-            db.redondear_precios_masivo(ids=ids, direccion="arriba")
-            messagebox.showinfo("Éxito", "Precios redondeados hacia arriba.")
-            self.refresh_productos()
-            if hasattr(self, 'refresh_tab_edicion'):
-                self.refresh_tab_edicion()
 
-    def _redondear_dn(self):
-        ids = self._get_selected_productos_ids()
-        if not ids:
-            messagebox.showwarning("Atención", "Debe seleccionar al menos un producto para redondear.")
-            return
-        if messagebox.askyesno("Confirmar", f"¿Seguro que desea redondear hacia ABAJO los {len(ids)} productos seleccionados?"):
-            db.redondear_precios_masivo(ids=ids, direccion="abajo")
-            messagebox.showinfo("Éxito", "Precios redondeados hacia abajo.")
-            self.refresh_productos()
-            if hasattr(self, 'refresh_tab_edicion'):
-                self.refresh_tab_edicion()
 
 
 
