@@ -2115,6 +2115,8 @@ class StockApp(tk.Tk):
         b_nuevo      = styled_btn(btn_frame, "+ Nuevo Producto", self._nuevo_producto,    color=SUCCESS, width=16)
         b_editar     = styled_btn(btn_frame, "✎ Editar Prod.",    self._editar_producto,   color=ACCENT,  width=16)
         b_aumento    = styled_btn(btn_frame, "📈 Precios",        self._abrir_aumento,     color=WARNING, width=16)
+        b_redondeo_up = styled_btn(btn_frame, "⬆ Redondear", self._redondear_up, color="#a35fcc", width=12)
+        b_redondeo_dn = styled_btn(btn_frame, "⬇ Redondear", self._redondear_dn, color="#a35fcc", width=12)
         b_eliminar   = styled_btn(btn_frame, "🗑 Eliminar",        self._eliminar_producto, color="#8b3a3a", width=16)
         # 1. Empacar PRIMERO los botones de la derecha para evitar que se recorten por falta de espacio
         # (se empacan en orden inverso porque pack(side="right") los apila hacia la izquierda)
