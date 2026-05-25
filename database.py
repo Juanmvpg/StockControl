@@ -278,52 +278,6 @@ def aplicar_aumento_masivo(valor, tipo_aumento, categoria=None, marca=None, ids=
         conn.commit()
     return cambios
 
-def redondear_precios_masivo(ids=None, direccion="arriba", categoria=None, marca=None):
-    cambios = []
-    with get_connection() as conn:
-        query_sel = "SELECT id, nombre, precio FROM productos WHERE 1=1"
-        params = []
-        if ids is not None and len(ids) > 0:
-            placeholders = ",".join(["?"] * len(ids))
-            query_sel += f" AND id IN ({placeholders})"
-            params.extend(ids)
-        else:
-            if categoria and categoria != "Cualquiera":
-                query_sel += " AND categoria=?"
-                params.append(categoria)
-            if marca and marca != "Cualquiera":
-                query_sel += " AND marca=?"
-                params.append(marca)
-                
-        productos_afectados = conn.execute(query_sel, tuple(params)).fetchall()
-        
-        for p in productos_afectados:
-            pid = p["id"]
-            nombre = p["nombre"]
-            precio_ant = Decimal(str(p["precio"] or 0))
-            
-            if direccion == "arriba":
-                precio_nuevo = precio_ant.quantize(Decimal('1'), rounding=ROUND_UP)
-            else:
-                precio_nuevo = precio_ant.quantize(Decimal('1'), rounding=ROUND_DOWN)
-                
-            if precio_nuevo == precio_ant:
-                continue
-                
-            precio_nuevo_float = float(precio_nuevo)
-            precio_ant_float = float(precio_ant)
-            
-            nota_mov = f"Redondeo ({direccion}), precio anterior: ${precio_ant_float:,.2f}, precio actual: ${precio_nuevo_float:,.2f}"
-            
-            conn.execute("UPDATE productos SET precio=? WHERE id=?", (precio_nuevo_float, pid))
-            conn.execute(
-                "INSERT INTO movimientos (producto_id, tipo, cantidad, nota, forzado, precio, grupo_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (pid, "entrada", 0, nota_mov, 0, precio_nuevo_float, None)
-            )
-            cambios.append((nombre, precio_ant_float, precio_nuevo_float))
-            
-        conn.commit()
-    return cambios
 
 def registrar_salida_multi(carrito_items, grupo_id=None, iter_precio=None):
     """
