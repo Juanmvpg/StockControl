@@ -1832,6 +1832,7 @@ class ImportarDialog(tk.Toplevel):
         self.grab_set()
         
         self.filepath = None
+        self.carga_rapida = False
         self.mapeo_resultado = {}  # {campo: {'col': 'A', 'inicio': 7, 'fin': None}}
         self.vars = {}  # {campo: {'col': tk.StringVar(), 'inicio': tk.StringVar(), 'fin': tk.StringVar()}}
         
@@ -1881,6 +1882,36 @@ class ImportarDialog(tk.Toplevel):
         )
         if not ruta:
             return
+            
+        # Intentar pre-escanear columnas para detectar formato estándar
+        try:
+            import pandas as pd
+            import pathlib
+            ext = pathlib.Path(ruta).suffix.lower()
+            if ext in ['.xlsx', '.xls']:
+                df_hdr = pd.read_excel(ruta, nrows=0)
+                cols = [str(c).strip().lower() for c in df_hdr.columns]
+            elif ext == '.csv':
+                df_hdr = pd.read_csv(ruta, nrows=0)
+                cols = [str(c).strip().lower() for c in df_hdr.columns]
+            else:
+                cols = []
+                
+            if 'id' in cols and 'nombre' in cols:
+                resp = messagebox.askyesno(
+                    "Formato Estándar Detectado",
+                    "Se detectó un archivo con la estructura estándar de Hornerito (con columna ID).\n\n"
+                    "¿Deseas realizar una carga rápida automática directa para aplicar las modificaciones e incorporar nuevos productos?\n"
+                    "(Se actualizarán directamente el stock, precios, nombres y otros campos).",
+                    parent=self
+                )
+                if resp:
+                    self.filepath = ruta
+                    self.carga_rapida = True
+                    self.destroy()
+                    return
+        except Exception:
+            pass
             
         self.filepath = ruta
         self.lbl_file.config(text=self.filepath.split("/")[-1], fg=TEXT)
@@ -4000,7 +4031,15 @@ class StockApp(tk.Tk):
 
     def _importar_datos(self):
         dlg = ImportarDialog(self)
-        if hasattr(dlg, "mapeo_resultado") and dlg.mapeo_resultado:
+        if getattr(dlg, "carga_rapida", False):
+            try:
+                filepath = dlg.filepath
+                nombres_nuevos, nombres_actualizados = db.importar_excel_estandar(filepath)
+                ImportacionResumenDialog(self, nombres_nuevos, nombres_actualizados)
+                self.refresh_productos()
+            except Exception as e:
+                messagebox.showerror("Error de importación rápida", f"Ocurrió un problema: {str(e)}")
+        elif hasattr(dlg, "mapeo_resultado") and dlg.mapeo_resultado:
             # Procesar la importacion
             try:
                 import importador

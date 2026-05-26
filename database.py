@@ -477,11 +477,20 @@ def exportar_excel(filepath):
     if not productos:
         return 0
     df = pd.DataFrame(productos)
-    cols_to_drop = [col for col in ['id', 'activo'] if col in df.columns]
+    cols_to_drop = [col for col in ['activo'] if col in df.columns]
     if cols_to_drop:
         df = df.drop(columns=cols_to_drop)
+        
+    # Reordenar columnas para una estructura clara y limpia
+    col_order = ['id', 'codigo', 'nombre', 'marca', 'categoria', 'stock', 'minimo', 'precio', 'precio_costo', 'por_peso', 'nota']
+    existing_cols = [c for c in col_order if c in df.columns]
+    df = df[existing_cols]
+    
+    if 'por_peso' in df.columns:
+        df['por_peso'] = df['por_peso'].map({1: 'Sí', 0: 'No'}).fillna('No')
     
     df = df.rename(columns={
+        'id': 'ID',
         'codigo': 'Código',
         'nombre': 'Nombre',
         'categoria': 'Categoría',
@@ -496,6 +505,130 @@ def exportar_excel(filepath):
     
     df.to_excel(filepath, index=False)
     return len(productos)
+
+
+def importar_excel_estandar(filepath):
+    import pandas as pd
+    df = pd.read_excel(filepath)
+    df = df.fillna("")
+    
+    mapeo_columnas = {
+        'ID': 'id',
+        'Código': 'codigo',
+        'Nombre': 'nombre',
+        'Categoría': 'categoria',
+        'Marca': 'marca',
+        'Stock': 'stock',
+        'Stock Mínimo': 'minimo',
+        'Precio Venta': 'precio',
+        'Precio Costo': 'precio_costo',
+        'Se vende por peso': 'por_peso',
+        'Nota': 'nota'
+    }
+    
+    # Renombrar columnas
+    df = df.rename(columns={col: mapeo_columnas[col] for col in df.columns if col in mapeo_columnas})
+    
+    if 'nombre' not in df.columns:
+        raise ValueError("El archivo Excel debe contener al menos la columna 'Nombre'.")
+        
+    nombres_nuevos = []
+    nombres_actualizados = []
+    
+    with get_connection() as conn:
+        for _, row in df.iterrows():
+            nombre = str(row.get('nombre', '')).strip()
+            if not nombre:
+                continue
+                
+            pid = row.get('id', '')
+            codigo = str(row.get('codigo', '')).strip()
+            categoria = str(row.get('categoria', '')).strip()
+            marca = str(row.get('marca', '')).strip()
+            nota = str(row.get('nota', '')).strip()
+            
+            try: stock = float(row.get('stock', 0))
+            except: stock = 0.0
+            
+            try: minimo = float(row.get('minimo', 0))
+            except: minimo = 0.0
+            
+            try: precio = float(row.get('precio', 0.0))
+            except: precio = 0.0
+            
+            try: precio_costo = float(row.get('precio_costo', 0.0))
+            except: precio_costo = 0.0
+            
+            por_peso_val = str(row.get('por_peso', 'No')).strip().lower()
+            por_peso = 1 if por_peso_val in ('sí', 'si', '1', 'true') else 0
+            
+            # Buscar producto existente
+            producto_existente = None
+            if pid:
+                try:
+                    pid_int = int(float(pid)) # Manejar enteros que se leen como float en pandas
+                    producto_existente = conn.execute("SELECT * FROM productos WHERE id=?", (pid_int,)).fetchone()
+                except ValueError:
+                    pass
+                    
+            if not producto_existente and codigo:
+                producto_existente = conn.execute("SELECT * FROM productos WHERE codigo=?", (codigo,)).fetchone()
+                
+            if not producto_existente:
+                producto_existente = conn.execute(
+                    "SELECT * FROM productos WHERE nombre=? AND IFNULL(marca, '')=? AND IFNULL(categoria, '')=?",
+                    (nombre, marca, categoria)
+                ).fetchone()
+                
+            if producto_existente:
+                row_exist = dict(producto_existente)
+                cambios = []
+                
+                # Comparamos campos
+                if row_exist["nombre"] != nombre:
+                    cambios.append(f"Nombre: {row_exist['nombre']} -> {nombre}")
+                if (row_exist["codigo"] or "") != codigo:
+                    cambios.append(f"Código: {row_exist['codigo']} -> {codigo}")
+                if (row_exist["categoria"] or "") != categoria:
+                    cambios.append(f"Categoría: {row_exist['categoria']} -> {categoria}")
+                if (row_exist["marca"] or "") != marca:
+                    cambios.append(f"Marca: {row_exist['marca']} -> {marca}")
+                if float(row_exist["stock"] or 0) != stock:
+                    cambios.append(f"Stock: {row_exist['stock']} -> {stock}")
+                if float(row_exist["minimo"] or 0) != minimo:
+                    cambios.append(f"Mínimo: {row_exist['minimo']} -> {minimo}")
+                if float(row_exist["precio"] or 0) != precio:
+                    cambios.append(f"Precio: {row_exist['precio']} -> {precio}")
+                if float(row_exist["precio_costo"] or 0) != precio_costo:
+                    cambios.append(f"Costo: {row_exist['precio_costo']} -> {precio_costo}")
+                if int(row_exist["por_peso"] or 0) != por_peso:
+                    cambios.append(f"Por peso: {'Sí' if por_peso else 'No'}")
+                if (row_exist["nota"] or "") != nota:
+                    cambios.append("Nota modificada")
+                if row_exist["activo"] == 0:
+                    cambios.append("Estado: [RECUPERADO DE PAPELERA]")
+                    
+                if cambios:
+                    conn.execute(
+                        "UPDATE productos SET codigo=?, nombre=?, categoria=?, marca=?, stock=?, minimo=?, precio=?, precio_costo=?, por_peso=?, nota=?, activo=1 WHERE id=?",
+                        (codigo, nombre, categoria, marca, stock, minimo, precio, precio_costo, por_peso, nota, row_exist["id"])
+                    )
+                    nombres_actualizados.append((nombre, cambios))
+            else:
+                # Insertar como nuevo
+                if not codigo:
+                    max_id_row = conn.execute("SELECT MAX(id) as mx FROM productos").fetchone()
+                    siguiente = (max_id_row["mx"] or 0) + 1
+                    codigo = f"PRD-E{siguiente:04d}"
+                    
+                conn.execute(
+                    "INSERT INTO productos (codigo, nombre, categoria, marca, stock, minimo, precio, precio_costo, por_peso, nota) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (codigo, nombre, categoria, marca, stock, minimo, precio, precio_costo, por_peso, nota)
+                )
+                nombres_nuevos.append(nombre)
+                
+    return nombres_nuevos, nombres_actualizados
+
 
 
 def vaciar_movimientos():
