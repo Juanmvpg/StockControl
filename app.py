@@ -1,11 +1,13 @@
 import logging
 """
 app.py – Interfaz gráfica principal (Tkinter)
-Control de Stock v1.0
+Control de Stock
 """
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 import database as db
+
+VERSION = "2.0.4"
 
 
 # ──────────────────────────────────────────────
@@ -1947,7 +1949,7 @@ class ImportarDialog(tk.Toplevel):
 class StockApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Hornerito Forrajería")
+        self.title(f"Hornerito Forrajería - v{VERSION}")
         self.geometry("1100x680")
         self.minsize(900, 560)
         try:
@@ -2026,7 +2028,7 @@ class StockApp(tk.Tk):
         header = tk.Frame(parent, bg=BG, pady=12)
         header.pack(fill="x", padx=16)
 
-        tk.Label(header, text="\U0001f4e6  Control de Stock",
+        tk.Label(header, text=f"\U0001f4e6  Control de Stock  v{VERSION}",
                  bg=BG, fg=ACCENT2,
                  font=("Segoe UI", 18, "bold")).pack(side="left")
 
