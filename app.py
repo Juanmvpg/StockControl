@@ -2025,12 +2025,13 @@ class StockApp(tk.Tk):
     # ── Cabecera ─────────────────────────────────
 
     def _build_header(self, parent):
-        header = tk.Frame(parent, bg=BG, pady=12)
+        header = tk.Frame(parent, bg=BG, pady=4)
         header.pack(fill="x", padx=16)
 
-        tk.Label(header, text=f"\U0001f4e6  Control de Stock  v{VERSION}",
+        self.lbl_header_title = tk.Label(header, text="📦  Ventas",
                  bg=BG, fg=ACCENT2,
-                 font=("Segoe UI", 18, "bold")).pack(side="left")
+                 font=("Segoe UI", 13, "bold"))
+        self.lbl_header_title.pack(side="left")
 
         # ── Toggle de bloqueo de edición ──────────────
         self.v_edicion = tk.BooleanVar(value=False)  # False = bloqueado
@@ -2064,7 +2065,12 @@ class StockApp(tk.Tk):
         self._build_header(self)
 
         self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        self.notebook.pack(fill="both", expand=True, padx=12, pady=(0, 2))
+        
+        # Footer con versión a la derecha, muy pequeño
+        footer_frame = tk.Frame(self, bg=BG)
+        footer_frame.pack(side="bottom", fill="x", padx=12, pady=(0, 4))
+        tk.Label(footer_frame, text=f"v{VERSION}", bg=BG, fg=TEXT_DIM, font=("Segoe UI", 7)).pack(side="right")
 
         # Pestaña 1: Productos (POS)
         tab_productos = tk.Frame(self.notebook, bg=BG)
@@ -3739,8 +3745,10 @@ class StockApp(tk.Tk):
             btn.config(state=state)
         if hasattr(self, 'btn_export_ventas'):
             self.btn_export_ventas.config(state=state)
+        self._update_header_title()
 
     def _on_tab_change(self, event):
+        self._update_header_title()
         tab = event.widget.tab("current", "text").strip()
         if "Historial" in tab:
             self.refresh_historial()
@@ -3759,6 +3767,17 @@ class StockApp(tk.Tk):
                 )
                 return
             self.refresh_tab_edicion()
+
+    def _update_header_title(self):
+        try:
+            curr_tab_idx = self.notebook.index("current")
+        except Exception:
+            curr_tab_idx = 0
+            
+        if curr_tab_idx == 0 and not self.v_edicion.get():
+            self.lbl_header_title.config(text="📦  Ventas")
+        else:
+            self.lbl_header_title.config(text="📦  Jaulas Gonzalez")
     def refresh_tab_edicion(self):
         """Refresca la lista de productos en la pestaña Edición aplicando filtros."""
         if not hasattr(self, "tree_ed"):
