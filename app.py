@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 import database as db
 
-VERSION = "1.0.6"
+VERSION = "1.0.7"
 
 
 # ──────────────────────────────────────────────
@@ -1373,13 +1373,47 @@ class ProductosOcultosDialog(tk.Toplevel):
         self.bind("<Escape>", lambda e: self.destroy())
         self.grab_set()
 
+        self._sort_col = None
+        self._sort_rev = False
+
         # Cabecera
         header = tk.Frame(self, bg=BG2, pady=12)
         header.pack(fill="x")
         tk.Label(header, text="👁  Gestión de Productos Ocultos", bg=BG2, fg=TEXT, font=("Segoe UI", 12, "bold")).pack(side="left", padx=16)
 
+        # Panel de Filtros y Búsqueda
+        filter_frame = tk.Frame(self, bg=BG, padx=16, pady=8)
+        filter_frame.pack(fill="x")
+
+        # Buscador
+        self.v_buscar = tk.StringVar()
+        self.v_buscar.trace_add("write", lambda *_: self._cargar_productos())
+        tk.Label(filter_frame, text="Buscar:", bg=BG, fg=TEXT, font=("Segoe UI", 9)).pack(side="left", padx=(0, 4))
+        self.entry_buscar = tk.Entry(filter_frame, textvariable=self.v_buscar, width=20, font=("Segoe UI", 9), bg=BG2, fg=TEXT, insertbackground=TEXT)
+        self.entry_buscar.pack(side="left", padx=(0, 16))
+
+        # Categoría
+        self.v_cat = tk.StringVar(value="Todas")
+        self.v_cat.trace_add("write", lambda *_: self._cargar_productos())
+        tk.Label(filter_frame, text="Categoría:", bg=BG, fg=TEXT, font=("Segoe UI", 9)).pack(side="left", padx=(0, 4))
+        self.cmb_cat = ttk.Combobox(filter_frame, textvariable=self.v_cat, state="readonly", width=14)
+        self.cmb_cat.pack(side="left", padx=(0, 16))
+
+        # Marca
+        self.v_marca = tk.StringVar(value="Todas")
+        self.v_marca.trace_add("write", lambda *_: self._cargar_productos())
+        tk.Label(filter_frame, text="Marca:", bg=BG, fg=TEXT, font=("Segoe UI", 9)).pack(side="left", padx=(0, 4))
+        self.cmb_marca = ttk.Combobox(filter_frame, textvariable=self.v_marca, state="readonly", width=14)
+        self.cmb_marca.pack(side="left")
+
+        # Cargar valores en dropdowns
+        categorias = ["Todas", "Sin categoría"] + [c for c in db.get_categorias() if c]
+        self.cmb_cat.config(values=categorias)
+        marcas = ["Todas", "Sin marca"] + [m for m in db.get_marcas() if m]
+        self.cmb_marca.config(values=marcas)
+
         # Contenedor de la tabla
-        tree_frame = tk.Frame(self, bg=BG, padx=12, pady=12)
+        tree_frame = tk.Frame(self, bg=BG, padx=12, pady=(4, 12))
         tree_frame.pack(fill="both", expand=True)
 
         cols = {
@@ -1395,7 +1429,7 @@ class ProductosOcultosDialog(tk.Toplevel):
         self.tree.configure(yscrollcommand=sb.set)
 
         for col, (hdr, width) in cols.items():
-            self.tree.heading(col, text=hdr, anchor="w")
+            self.tree.heading(col, text=hdr, anchor="w", command=lambda _c=col: self._sort_column(_c))
             self.tree.column(col, width=width, anchor="w")
 
         self.tree.pack(side="left", fill="both", expand=True)
@@ -1410,17 +1444,68 @@ class ProductosOcultosDialog(tk.Toplevel):
 
         # Cargar los datos
         self._cargar_productos()
+        self.entry_buscar.focus_set()
 
     def _cargar_productos(self):
         self.tree.delete(*self.tree.get_children())
         prods = db.get_productos_ocultos()
-        for i, p in enumerate(prods):
+        
+        busqueda = self.v_buscar.get().strip().lower()
+        cat_filtrada = self.v_cat.get()
+        marca_filtrada = self.v_marca.get()
+        
+        visible_index = 0
+        for p in prods:
+            # Filtro por buscador
+            if busqueda:
+                texto = f"{p.get('codigo','')} {p.get('nombre','')} {p.get('categoria','')} {p.get('marca','')}".lower()
+                if busqueda not in texto:
+                    continue
+            
+            # Filtro por categoría
+            c = p.get("categoria", "")
+            if cat_filtrada == "Sin categoría" and c:
+                continue
+            if cat_filtrada != "Todas" and cat_filtrada != "Sin categoría" and c != cat_filtrada:
+                continue
+                
+            # Filtro por marca
+            m = p.get("marca", "")
+            if marca_filtrada == "Sin marca" and m:
+                continue
+            if marca_filtrada != "Todas" and marca_filtrada != "Sin marca" and m != marca_filtrada:
+                continue
+                
             precio_str = f"${p['precio']:,.2f}"
-            tag = "alt" if i % 2 == 1 else ""
+            tag = "alt" if visible_index % 2 == 1 else ""
             self.tree.insert("", "end", iid=str(p["id"]),
-                             values=(p["codigo"], p["nombre"], p["categoria"], p["marca"], precio_str),
+                             values=(p.get("codigo", ""), p.get("nombre", ""), p.get("categoria", "") or "", p.get("marca", "") or "", precio_str),
                              tags=(tag,))
+            visible_index += 1
+            
         self.tree.tag_configure("alt", background=ROW_ALT)
+        
+        # Mantener el ordenamiento si existe
+        if hasattr(self, "_sort_col") and self._sort_col:
+            self._sort_column(self._sort_col, toggle=False)
+
+    def _sort_column(self, col, toggle=True):
+        items = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
+        if toggle:
+            rev = self._sort_col == col and not self._sort_rev
+        else:
+            rev = self._sort_rev if self._sort_col == col else False
+            
+        try:
+            items.sort(key=lambda t: float(t[0].replace("$","").replace(",","")) if t[0].replace("$","").replace(",","").replace(".","").isdigit() else t[0].lower(), reverse=rev)
+        except Exception:
+            items.sort(key=lambda t: t[0].lower(), reverse=rev)
+            
+        for idx, (_, k) in enumerate(items):
+            self.tree.move(k, "", idx)
+            
+        self._sort_col = col
+        self._sort_rev = rev
 
     def _mostrar_seleccionados(self):
         sel = self.tree.selection()
