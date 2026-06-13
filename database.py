@@ -85,6 +85,8 @@ def init_db():
             conn.execute("ALTER TABLE productos ADD COLUMN activo INTEGER DEFAULT 1")
         if "precio_costo" not in cols_prod:
             conn.execute("ALTER TABLE productos ADD COLUMN precio_costo REAL DEFAULT 0.0")
+        if "oculto" not in cols_prod:
+            conn.execute("ALTER TABLE productos ADD COLUMN oculto INTEGER DEFAULT 0")
 
 
 # ──────────────────────────────────────────────
@@ -97,11 +99,11 @@ def get_productos(filtro=""):
         if filtro:
             like = f"%{unaccent_lower(filtro)}%"
             rows = conn.execute(
-                "SELECT * FROM productos WHERE activo=1 AND (unaccent_lower(codigo) LIKE ? OR unaccent_lower(nombre) LIKE ? OR unaccent_lower(categoria) LIKE ? OR unaccent_lower(marca) LIKE ?) ORDER BY nombre",
+                "SELECT * FROM productos WHERE activo=1 AND oculto=0 AND (unaccent_lower(codigo) LIKE ? OR unaccent_lower(nombre) LIKE ? OR unaccent_lower(categoria) LIKE ? OR unaccent_lower(marca) LIKE ?) ORDER BY nombre",
                 (like, like, like, like)
             ).fetchall()
         else:
-            rows = conn.execute("SELECT * FROM productos WHERE activo=1 ORDER BY nombre").fetchall()
+            rows = conn.execute("SELECT * FROM productos WHERE activo=1 AND oculto=0 ORDER BY nombre").fetchall()
     return [dict(r) for r in rows]
 
 
@@ -462,7 +464,7 @@ def get_stock_bajo():
     """Productos cuyo stock está por debajo del mínimo."""
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT * FROM productos WHERE stock < minimo AND activo = 1 ORDER BY nombre"
+            "SELECT * FROM productos WHERE stock < minimo AND activo = 1 AND oculto = 0 ORDER BY nombre"
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -717,4 +719,23 @@ def can_undo():
 
 def can_redo():
     return len(redo_stack) > 0
+
+
+# ──────────────────────────────────────────────
+#  Ocultar / Mostrar Productos
+# ──────────────────────────────────────────────
+
+def get_productos_ocultos():
+    """Devuelve los productos que están ocultos (activo=1 y oculto=1)."""
+    with get_connection() as conn:
+        rows = conn.execute("SELECT * FROM productos WHERE activo=1 AND oculto=1 ORDER BY nombre").fetchall()
+    return [dict(r) for r in rows]
+
+def ocultar_productos(ids, ocultar=True):
+    """Oculta o muestra productos según el parámetro."""
+    val = 1 if ocultar else 0
+    placeholders = ",".join(["?"] * len(ids))
+    with get_connection() as conn:
+        conn.execute(f"UPDATE productos SET oculto=? WHERE id IN ({placeholders})", (val, *ids))
+        conn.commit()
 

@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 import database as db
 
-VERSION = "1.0.5"
+VERSION = "1.0.6"
 
 
 # ──────────────────────────────────────────────
@@ -1358,6 +1358,85 @@ class ImportacionResumenDialog(tk.Toplevel):
         styled_btn(btn_frame, "Aceptar", self.destroy, color=BG3).pack()
 
 
+# ──────────────────────────────────────────────
+#  Ventana de Gestión de Productos Ocultos
+# ──────────────────────────────────────────────
+
+class ProductosOcultosDialog(tk.Toplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent_app = parent
+        self.title("👁  Productos Ocultos")
+        self.geometry("800x500")
+        self.minsize(600, 400)
+        self.configure(bg=BG)
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.grab_set()
+
+        # Cabecera
+        header = tk.Frame(self, bg=BG2, pady=12)
+        header.pack(fill="x")
+        tk.Label(header, text="👁  Gestión de Productos Ocultos", bg=BG2, fg=TEXT, font=("Segoe UI", 12, "bold")).pack(side="left", padx=16)
+
+        # Contenedor de la tabla
+        tree_frame = tk.Frame(self, bg=BG, padx=12, pady=12)
+        tree_frame.pack(fill="both", expand=True)
+
+        cols = {
+            "codigo": ("Código", 80),
+            "nombre": ("Nombre", 250),
+            "categoria": ("Categoría", 120),
+            "marca": ("Marca", 120),
+            "precio": ("Precio Venta", 100),
+        }
+
+        self.tree = ttk.Treeview(tree_frame, columns=list(cols.keys()), show="headings", height=15)
+        sb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=sb.set)
+
+        for col, (hdr, width) in cols.items():
+            self.tree.heading(col, text=hdr, anchor="w")
+            self.tree.column(col, width=width, anchor="w")
+
+        self.tree.pack(side="left", fill="both", expand=True)
+        sb.pack(side="right", fill="y")
+
+        # Botones en la parte inferior
+        bot_frame = tk.Frame(self, bg=BG2, pady=12)
+        bot_frame.pack(fill="x", side="bottom")
+
+        styled_btn(bot_frame, "👁 Mostrar en Catálogo", self._mostrar_seleccionados, color=SUCCESS).pack(side="left", padx=16)
+        styled_btn(bot_frame, "Cerrar", self.destroy, color=BG3).pack(side="right", padx=16)
+
+        # Cargar los datos
+        self._cargar_productos()
+
+    def _cargar_productos(self):
+        self.tree.delete(*self.tree.get_children())
+        prods = db.get_productos_ocultos()
+        for i, p in enumerate(prods):
+            precio_str = f"${p['precio']:,.2f}"
+            tag = "alt" if i % 2 == 1 else ""
+            self.tree.insert("", "end", iid=str(p["id"]),
+                             values=(p["codigo"], p["nombre"], p["categoria"], p["marca"], precio_str),
+                             tags=(tag,))
+        self.tree.tag_configure("alt", background=ROW_ALT)
+
+    def _mostrar_seleccionados(self):
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showinfo("Selección", "Selecciona al menos un producto para mostrar.", parent=self)
+            return
+
+        ids = [int(x) for x in sel]
+        if messagebox.askyesno("Confirmar", f"¿Desea volver a mostrar los {len(ids)} productos seleccionados?", parent=self):
+            db.save_state("Mostrar producto" if len(ids) == 1 else "Mostrar productos")
+            db.ocultar_productos(ids, ocultar=False)
+            self._cargar_productos()
+            self.parent_app.refresh_productos()
+            self.parent_app._mostrar_mensaje_status(f"👁 Mostrados: {len(ids)} producto{'s' if len(ids) != 1 else ''}")
+
+
 class ILovePdfDialog(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
@@ -2280,6 +2359,7 @@ class StockApp(tk.Tk):
         b_editar     = styled_btn(btn_frame, "✎ Editar Prod.",    self._editar_producto,   color=ACCENT,  width=16)
         b_aumento    = styled_btn(btn_frame, "📈 Precios",        self._abrir_aumento,     color=WARNING, width=16)
         b_eliminar   = styled_btn(btn_frame, "🗑 Eliminar",        self._eliminar_producto, color="#8b3a3a", width=16)
+        b_ocultar    = styled_btn(btn_frame, "👁 Ocultar",        self._ocultar_producto_handler, color="#5f6368", width=12)
         # 1. Empacar PRIMERO los botones de la derecha para evitar que se recorten por falta de espacio
         # (se empacan en orden inverso porque pack(side="right") los apila hacia la izquierda)
         
@@ -2332,6 +2412,7 @@ class StockApp(tk.Tk):
         
         tk.Frame(btn_frame, width=10, bg=BG).pack(side="left")  # Separador
         b_eliminar.pack(side="left", padx=6)
+        b_ocultar.pack(side="left", padx=6)
         
         # ── Opciones Previas y Alertas ──────────────
         info_foot = tk.Label(parent, text="⚠ Selecciona los productos que deseas afectar desde la lista de abajo antes de utilizar estas herramientas.", bg=BG, fg=WARNING, font=("Segoe UI", 9))
@@ -2476,7 +2557,7 @@ class StockApp(tk.Tk):
         self.tree_ed.bind("<F2>", _on_tree_ed_f2)
 
         # Guardar referencias para controlar con el lock
-        self._btns_edicion = [b_nuevo, b_editar, b_aumento, b_eliminar, mb_datos, b_entrada]
+        self._btns_edicion = [b_nuevo, b_editar, b_aumento, b_eliminar, b_ocultar, mb_datos, b_entrada]
         self._aplicar_estado_edicion()
 
     # ── MÉTODOS MODO STOCK RÁPIDO ─────────────────────────
@@ -4118,6 +4199,28 @@ class StockApp(tk.Tk):
             self._deseleccionar_todos()
             self._deseleccionar_todos_edicion()
             self.refresh_productos()
+
+    def _ocultar_producto_handler(self):
+        ids = self._get_selected_productos_ids()
+        if not ids:
+            self._abrir_productos_ocultos_dialog()
+        else:
+            if len(ids) == 1:
+                prod = db.get_producto_by_id(ids[0])
+                msg = f"¿Ocultar el producto «{prod['nombre']}»?\n\nNo se mostrará en el mostrador de ventas (POS) ni en la lista de edición."
+            else:
+                msg = f"¿Ocultar los {len(ids)} productos seleccionados?\n\nNo se mostrarán en el mostrador de ventas (POS) ni en la lista de edición."
+
+            if messagebox.askyesno("Confirmar Ocultar", msg, parent=self):
+                db.save_state("Ocultar producto" if len(ids) == 1 else "Ocultar productos")
+                db.ocultar_productos(ids, ocultar=True)
+                self._deseleccionar_todos()
+                self._deseleccionar_todos_edicion()
+                self.refresh_productos()
+                self._mostrar_mensaje_status(f"👁 Ocultado{'s' if len(ids) != 1 else ''}: {len(ids)} producto{'s' if len(ids) != 1 else ''}")
+
+    def _abrir_productos_ocultos_dialog(self):
+        ProductosOcultosDialog(self)
 
     def _entrada_stock(self):
         prod = self._get_selected_producto()
