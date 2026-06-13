@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 import database as db
 
-VERSION = "1.0.7"
+VERSION = "1.0.8"
 
 
 # ──────────────────────────────────────────────
@@ -2436,25 +2436,48 @@ class StockApp(tk.Tk):
         info_lbl = tk.Label(toolbar, text="Panel de Administración y Edición de Productos", bg=BG, fg=TEXT_DIM, font=("Segoe UI", 11, "italic"))
         info_lbl.pack(side="top", anchor="w", pady=(0, 10))
         
-        btn_frame = tk.Frame(toolbar, bg=BG)
-        btn_frame.pack(fill="x")
+        # Creamos dos filas para optimizar la distribución visual y evitar solapamientos
+        row1_frame = tk.Frame(toolbar, bg=BG)
+        row1_frame.pack(fill="x", pady=(0, 4))
+        
+        row2_frame = tk.Frame(toolbar, bg=BG)
+        row2_frame.pack(fill="x", pady=(4, 0))
 
         # Botones que se bloquean con el lock de edición
-        b_nuevo      = styled_btn(btn_frame, "+ Nuevo Producto", self._nuevo_producto,    color=SUCCESS, width=16)
-        b_editar     = styled_btn(btn_frame, "✎ Editar Prod.",    self._editar_producto,   color=ACCENT,  width=16)
-        b_aumento    = styled_btn(btn_frame, "📈 Precios",        self._abrir_aumento,     color=WARNING, width=16)
-        b_eliminar   = styled_btn(btn_frame, "🗑 Eliminar",        self._eliminar_producto, color="#8b3a3a", width=16)
-        b_ocultar    = styled_btn(btn_frame, "👁 Ocultar",        self._ocultar_producto_handler, color="#5f6368", width=12)
-        # 1. Empacar PRIMERO los botones de la derecha para evitar que se recorten por falta de espacio
-        # (se empacan en orden inverso porque pack(side="right") los apila hacia la izquierda)
+        b_nuevo      = styled_btn(row1_frame, "+ Nuevo Producto", self._nuevo_producto,    color=SUCCESS, width=16)
+        b_editar     = styled_btn(row1_frame, "✎ Editar Prod.",    self._editar_producto,   color=ACCENT,  width=16)
+        b_aumento    = styled_btn(row2_frame, "📈 Precios",        self._abrir_aumento,     color=WARNING, width=16)
+        b_eliminar   = styled_btn(row1_frame, "🗑 Eliminar",        self._eliminar_producto, color="#8b3a3a", width=16)
+        b_ocultar    = styled_btn(row1_frame, "👁 Ocultar",        self._ocultar_producto_handler, color="#5f6368", width=12)
         
-        # Botón Actualizar
-        b_actualizar = styled_btn(btn_frame, "🔄 Actualizar", self.refresh_tab_edicion, color=BG3)
+        # --- Fila 1 (Gestión de Productos) ---
+        b_nuevo.pack(side="left", padx=6)
+        b_editar.pack(side="left", padx=6)
+        b_eliminar.pack(side="left", padx=6)
+        b_ocultar.pack(side="left", padx=6)
+        
+        # Botón Actualizar a la derecha
+        b_actualizar = styled_btn(row1_frame, "🔄 Actualizar", self.refresh_tab_edicion, color=BG3)
         b_actualizar.pack(side="right", padx=6)
 
-        # Menú desplegable Exportar / Importar
+        # --- Fila 2 (Operaciones y Utilidades) ---
+        b_entrada = styled_btn(row2_frame, "▲ Entrada", self._entrada_stock, color="#4fa882", width=12)
+        b_entrada.pack(side="left", padx=6)
+        self._btn_entrada = b_entrada
+        
+        b_stock_rapido = styled_btn(row2_frame, "⚡ Stock Rápido", self._toggle_modo_stock_rapido, color="#2563eb", width=14)
+        b_stock_rapido.pack(side="left", padx=6)
+        self._btn_stock_rapido = b_stock_rapido
+        
+        tk.Frame(row2_frame, width=10, bg=BG).pack(side="left")  # Separador
+        b_aumento.pack(side="left", padx=6)
+        
+        b_limpiar_ed = styled_btn(row2_frame, "🧹 Limpiar selección", self._deseleccionar_todos_edicion, color=BG3)
+        b_limpiar_ed.pack(side="left", padx=6)
+
+        # Menú desplegable Exportar / Importar a la derecha
         mb_datos = tk.Menubutton(
-            btn_frame, text="📁 Datos ▾",
+            row2_frame, text="📁 Datos ▾",
             bg=BG3, fg=TEXT, relief="flat",
             font=("Segoe UI", 9, "bold"),
             padx=10, pady=6, cursor="hand2"
@@ -2476,28 +2499,6 @@ class StockApp(tk.Tk):
         menu_datos.add_command(label="📝  Hoja de Cálculo", command=self._abrir_hoja_calculo)
         mb_datos.config(menu=menu_datos)
         mb_datos.pack(side="right", padx=6)
-        
-        # Botón Limpiar Selección explícito
-        b_limpiar_ed = styled_btn(btn_frame, "🧹 Limpiar selección", self._deseleccionar_todos_edicion, color=BG3)
-        b_limpiar_ed.pack(side="right", padx=6)
-
-        # 2. Empacar botones de la izquierda
-        b_nuevo.pack(side="left", padx=6)
-        b_editar.pack(side="left", padx=6)
-        b_aumento.pack(side="left", padx=6)
-
-        tk.Frame(btn_frame, width=10, bg=BG).pack(side="left")  # Separador
-        b_entrada = styled_btn(btn_frame, "▲ Entrada", self._entrada_stock, color="#4fa882", width=12)
-        b_entrada.pack(side="left", padx=6)
-        self._btn_entrada = b_entrada
-        
-        b_stock_rapido = styled_btn(btn_frame, "⚡ Stock Rápido", self._toggle_modo_stock_rapido, color="#2563eb", width=14)
-        b_stock_rapido.pack(side="left", padx=6)
-        self._btn_stock_rapido = b_stock_rapido
-        
-        tk.Frame(btn_frame, width=10, bg=BG).pack(side="left")  # Separador
-        b_eliminar.pack(side="left", padx=6)
-        b_ocultar.pack(side="left", padx=6)
         
         # ── Opciones Previas y Alertas ──────────────
         info_foot = tk.Label(parent, text="⚠ Selecciona los productos que deseas afectar desde la lista de abajo antes de utilizar estas herramientas.", bg=BG, fg=WARNING, font=("Segoe UI", 9))
