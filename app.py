@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 import database as db
 
-VERSION = "1.0.9"
+VERSION = "1.0.10"
 
 
 # ──────────────────────────────────────────────
@@ -1519,6 +1519,7 @@ class ProductosOcultosDialog(tk.Toplevel):
             db.ocultar_productos(ids, ocultar=False)
             self._cargar_productos()
             self.parent_app.refresh_productos()
+            self.parent_app.refresh_tab_edicion()
             self.parent_app._mostrar_mensaje_status(f"👁 Mostrados: {len(ids)} producto{'s' if len(ids) != 1 else ''}")
 
 
@@ -4224,6 +4225,7 @@ class StockApp(tk.Tk):
                 db.save_state("Nuevo producto")
                 db.crear_producto(*dlg.resultado)
                 self.refresh_productos()
+                self.refresh_tab_edicion()
             except Exception as e:
                 messagebox.showerror("Error al crear", str(e))
 
@@ -4243,6 +4245,7 @@ class StockApp(tk.Tk):
                     db.save_state("Editar producto")
                     db.actualizar_producto(prod["id"], *dlg.resultado)
                     self.refresh_productos()
+                    self.refresh_tab_edicion()
                 except Exception as e:
                     messagebox.showerror("Error al actualizar", str(e))
         else:
@@ -4253,6 +4256,7 @@ class StockApp(tk.Tk):
                     db.save_state("Edición masiva")
                     db.actualizar_productos_masivo(ids, dlg.resultado)
                     self.refresh_productos()
+                    self.refresh_tab_edicion()
                     messagebox.showinfo("Edición Masiva", f"Se actualizaron {len(ids)} productos exitosamente.")
                 except Exception as e:
                     messagebox.showerror("Error al actualizar", f"Ocurrió un error en la actualización masiva:\n{str(e)}")
@@ -4281,6 +4285,7 @@ class StockApp(tk.Tk):
             self._deseleccionar_todos()
             self._deseleccionar_todos_edicion()
             self.refresh_productos()
+            self.refresh_tab_edicion()
 
     def _ocultar_producto_handler(self):
         ids = self._get_selected_productos_ids()
@@ -4299,6 +4304,7 @@ class StockApp(tk.Tk):
                 self._deseleccionar_todos()
                 self._deseleccionar_todos_edicion()
                 self.refresh_productos()
+                self.refresh_tab_edicion()
                 self._mostrar_mensaje_status(f"👁 Ocultado{'s' if len(ids) != 1 else ''}: {len(ids)} producto{'s' if len(ids) != 1 else ''}")
 
     def _abrir_productos_ocultos_dialog(self):
@@ -4311,6 +4317,7 @@ class StockApp(tk.Tk):
         dlg = MovimientoDialog(self, prod, "entrada")
         if dlg.resultado:
             self.refresh_productos()
+            self.refresh_tab_edicion()
 
     def _abrir_carrito(self):
         if not hasattr(self, "_seleccionados_pos") or not self._seleccionados_pos:
@@ -4331,6 +4338,7 @@ class StockApp(tk.Tk):
             if hasattr(self, "_cantidades_carrito"):
                 self._cantidades_carrito.clear()
             self.refresh_productos()
+            self.refresh_tab_edicion()
 
     def _abrir_reporte_capital(self):
         ReporteCapitalDialog(self)
@@ -4354,6 +4362,7 @@ class StockApp(tk.Tk):
                 nombres_nuevos, nombres_actualizados = db.importar_excel_estandar(filepath)
                 ImportacionResumenDialog(self, nombres_nuevos, nombres_actualizados)
                 self.refresh_productos()
+                self.refresh_tab_edicion()
             except Exception as e:
                 messagebox.showerror("Error de importación rápida", f"Ocurrió un problema: {str(e)}")
         elif hasattr(dlg, "mapeo_resultado") and dlg.mapeo_resultado:
@@ -4402,6 +4411,7 @@ class StockApp(tk.Tk):
 
                 ImportacionResumenDialog(self, nombres_nuevos, nombres_actualizados)
                 self.refresh_productos()
+                self.refresh_tab_edicion()
                 
             except Exception as e:
                 messagebox.showerror("Error de importación", f"Ocurrió un problema: {str(e)}")
