@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 import database as db
 
-VERSION = "1.0.10"
+VERSION = "1.0.11"
 
 
 # ──────────────────────────────────────────────
@@ -1413,8 +1413,8 @@ class ProductosOcultosDialog(tk.Toplevel):
         self.cmb_marca.config(values=marcas)
 
         # Contenedor de la tabla
-        tree_frame = tk.Frame(self, bg=BG, padx=12, pady=(4, 12))
-        tree_frame.pack(fill="both", expand=True)
+        tree_frame = tk.Frame(self, bg=BG)
+        tree_frame.pack(fill="both", expand=True, padx=12, pady=(4, 12))
 
         cols = {
             "codigo": ("Código", 80),

@@ -18,6 +18,13 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
+def report_callback_exception(self, exc, val, tb):
+    logging.error("Exception in Tkinter callback", exc_info=(exc, val, tb))
+    sys.__excepthook__(exc, val, tb)
+
+import tkinter as tk
+tk.Tk.report_callback_exception = report_callback_exception
+
 if __name__ == "__main__":
     db.init_db()
     app = StockApp()
