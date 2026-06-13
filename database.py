@@ -638,3 +638,83 @@ def vaciar_movimientos():
         conn.execute("DELETE FROM movimientos")
         conn.execute("UPDATE configuracion SET valor = '0' WHERE clave = 'ultimo_orden'")
     return n
+
+
+# ──────────────────────────────────────────────
+#  Deshacer / Rehacer (Undo / Redo)
+# ──────────────────────────────────────────────
+
+undo_stack = []
+redo_stack = []
+
+def save_state(description):
+    """Guarda una copia de los bytes de stock.db en la pila de deshacer."""
+    global undo_stack, redo_stack
+    import logging
+    try:
+        if DB_FILE.exists():
+            with open(DB_FILE, "rb") as f:
+                db_bytes = f.read()
+            undo_stack.append((db_bytes, description))
+            if len(undo_stack) > 30:
+                undo_stack.pop(0)
+            redo_stack.clear()
+    except Exception as e:
+        logging.exception("Error al guardar estado de deshacer:")
+
+def undo():
+    """Restaura el estado anterior de la base de datos."""
+    global undo_stack, redo_stack
+    import logging
+    if not undo_stack:
+        return None
+    try:
+        # Capturar el estado actual para la pila de rehacer
+        if DB_FILE.exists():
+            with open(DB_FILE, "rb") as f:
+                current_bytes = f.read()
+        else:
+            current_bytes = b""
+            
+        db_bytes, desc = undo_stack.pop()
+        redo_stack.append((current_bytes, desc))
+        
+        with open(DB_FILE, "wb") as f:
+            f.write(db_bytes)
+            
+        return desc
+    except Exception as e:
+        logging.exception("Error al deshacer:")
+        return None
+
+def redo():
+    """Restaura un cambio que fue deshecho."""
+    global undo_stack, redo_stack
+    import logging
+    if not redo_stack:
+        return None
+    try:
+        # Capturar el estado actual para la pila de deshacer
+        if DB_FILE.exists():
+            with open(DB_FILE, "rb") as f:
+                current_bytes = f.read()
+        else:
+            current_bytes = b""
+            
+        db_bytes, desc = redo_stack.pop()
+        undo_stack.append((current_bytes, desc))
+        
+        with open(DB_FILE, "wb") as f:
+            f.write(db_bytes)
+            
+        return desc
+    except Exception as e:
+        logging.exception("Error al rehacer:")
+        return None
+
+def can_undo():
+    return len(undo_stack) > 0
+
+def can_redo():
+    return len(redo_stack) > 0
+

@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 import database as db
 
-VERSION = "2.0.4"
+VERSION = "2.0.5"
 
 
 # ──────────────────────────────────────────────
@@ -63,6 +63,38 @@ def fmt_qty(val, por_peso=0):
         return f"{res} Kg" if por_peso else res
     except:
         return str(val)
+
+
+class ToolTip:
+    def __init__(self, widget, text_func):
+        self.widget = widget
+        self.text_func = text_func  # can be string or function returning string
+        self.tip_window = None
+        widget.bind("<Enter>", self.show_tip)
+        widget.bind("<Leave>", self.hide_tip)
+
+    def show_tip(self, event=None):
+        if self.tip_window:
+            return
+        text = self.text_func() if callable(self.text_func) else self.text_func
+        if not text:
+            return
+        x = self.widget.winfo_rootx() + 10
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+        self.tip_window = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(tw, text=text, justify=tk.LEFT,
+                         background=BG3, foreground=TEXT,
+                         relief="solid", borderwidth=1, highlightthickness=0,
+                         font=("Segoe UI", 9), padx=6, pady=4)
+        label.pack(ipadx=1)
+
+    def hide_tip(self, event=None):
+        tw = self.tip_window
+        self.tip_window = None
+        if tw:
+            tw.destroy()
 
 
 # ──────────────────────────────────────────────
@@ -431,6 +463,7 @@ class MovimientoDialog(tk.Toplevel):
         nota = self.v_nota.get().strip()
         try:
             precio_total = (cantidad * producto.get("precio", 0.0)) if tipo == "salida" else None
+            db.save_state("Entrada de stock" if tipo == "entrada" else "Salida de stock")
             db.registrar_movimiento(producto["id"], tipo, cantidad, nota, forzar=False, precio_total=precio_total)
             self.resultado = True
             self.destroy()
@@ -447,6 +480,7 @@ class MovimientoDialog(tk.Toplevel):
                 if resp:
                     nota_exc = (nota + " [EXCEPCI\u00d3N: stock insuficiente]").strip()
                     precio_total = (cantidad * producto.get("precio", 0.0)) if tipo == "salida" else None
+                    db.save_state("Salida de stock")
                     db.registrar_movimiento(producto["id"], tipo, cantidad, nota_exc, forzar=True, precio_total=precio_total)
                     self.resultado = True
                     self.destroy()
@@ -867,6 +901,7 @@ class AumentoMasivoDialog(tk.Toplevel):
         resp = messagebox.askyesno("Confirmar Ajuste", msg, icon="warning", parent=self)
         if resp:
             ids_to_update = [p["id"] for p in self.productos_seleccionados]
+            db.save_state("Ajuste masivo de precios")
             cambios = db.aplicar_aumento_masivo(valor, tipo, cat, marca, ids_to_update)
             self.resultado = True
             self.destroy()
@@ -1173,6 +1208,7 @@ class SalidaMultipleDialog(tk.Toplevel):
             resolver_conflicto = "global" if resp else "individual"
 
         # Generar un ID de grupo simple incremental
+        db.save_state("Registrar venta")
         grupo_id = db.get_incremental_order()
 
         # FASE 1: Validación y cálculo
@@ -2078,13 +2114,37 @@ class StockApp(tk.Tk):
         self.btn_lock.pack(side="right", padx=12)
 
         # Ruedita de configuración
-        tk.Button(
+        self.btn_config = tk.Button(
             header, text="⚙️",
             command=self._abrir_configuracion,
             bg=BG3, fg=TEXT, relief="flat",
             font=("Segoe UI", 12), padx=6, pady=4,
             cursor="hand2"
-        ).pack(side="right", padx=4)
+        )
+        self.btn_config.pack(side="right", padx=4)
+
+        # Botón de rehacer (↷)
+        self.btn_redo = tk.Button(
+            header, text="↷",
+            command=self._rehacer,
+            bg=BG3, fg=TEXT, relief="flat",
+            font=("Segoe UI", 12), padx=6, pady=4,
+            cursor="hand2"
+        )
+        self.btn_redo.pack(side="right", padx=4)
+        self.tip_redo = ToolTip(self.btn_redo, self._get_redo_tooltip)
+
+        # Botón de deshacer (↶)
+        self.btn_undo = tk.Button(
+            header, text="↶",
+            command=self._deshacer,
+            bg=BG3, fg=TEXT, relief="flat",
+            font=("Segoe UI", 12), padx=6, pady=4,
+            cursor="hand2"
+        )
+        self.btn_undo.pack(side="right", padx=4)
+        self.tip_undo = ToolTip(self.btn_undo, self._get_undo_tooltip)
+
         # (Datos movidos a la pestaña de Edición)
         self.lbl_total = tk.Label(header, text="", bg=BG, fg=TEXT_DIM,
                                   font=("Segoe UI", 9))
@@ -2102,6 +2162,8 @@ class StockApp(tk.Tk):
         footer_frame = tk.Frame(self, bg=BG)
         footer_frame.pack(side="bottom", fill="x", padx=12, pady=(0, 4))
         tk.Label(footer_frame, text=f"v{VERSION}", bg=BG, fg=TEXT_DIM, font=("Segoe UI", 7)).pack(side="right")
+        self.lbl_status_global = tk.Label(footer_frame, text="", bg=BG, fg=SUCCESS, font=("Segoe UI", 8, "italic"))
+        self.lbl_status_global.pack(side="left")
 
         # Pestaña 1: Productos (POS)
         tab_productos = tk.Frame(self.notebook, bg=BG)
@@ -2132,6 +2194,8 @@ class StockApp(tk.Tk):
         self.bind_all("<F10>", lambda e: self.notebook.select(3))
         self.bind_all("<F5>", lambda e: self._refresh_all_tabs())
         self.bind_all("<Alt-e>", lambda e: self._toggle_edicion())
+        self.bind_all("<Control-z>", self._on_global_undo)
+        self.bind_all("<Control-y>", self._on_global_redo)
         
     def _refresh_all_tabs(self):
         self.refresh_productos()
@@ -2139,6 +2203,65 @@ class StockApp(tk.Tk):
             self.refresh_tab_edicion()
         self.refresh_historial()
         self.refresh_alertas()
+
+    # ── MÉTODOS DE DESHACER / REHACER ────────────────────
+
+    def _get_undo_tooltip(self):
+        if db.can_undo():
+            desc = db.undo_stack[-1][1]
+            return f"Deshacer: {desc} (Ctrl+Z)"
+        return "Nada para deshacer"
+
+    def _get_redo_tooltip(self):
+        if db.can_redo():
+            desc = db.redo_stack[-1][1]
+            return f"Rehacer: {desc} (Ctrl+Y)"
+        return "Nada para rehacer"
+
+    def _actualizar_botones_undo_redo(self):
+        if not hasattr(self, "btn_undo") or not hasattr(self, "btn_redo"):
+            return
+        # Deshacer
+        if db.can_undo():
+            self.btn_undo.config(state="normal", fg=TEXT)
+        else:
+            self.btn_undo.config(state="disabled", fg=TEXT_DIM)
+        # Rehacer
+        if db.can_redo():
+            self.btn_redo.config(state="normal", fg=TEXT)
+        else:
+            self.btn_redo.config(state="disabled", fg=TEXT_DIM)
+
+    def _mostrar_mensaje_status(self, text, is_success=True):
+        if hasattr(self, "lbl_status_global"):
+            self.lbl_status_global.config(text=text, fg=SUCCESS if is_success else WARNING)
+            self.after(3500, lambda: self.lbl_status_global.config(text="") if hasattr(self, "lbl_status_global") and self.lbl_status_global.cget("text") == text else None)
+
+    def _deshacer(self):
+        desc = db.undo()
+        if desc:
+            self._refresh_all_tabs()
+            self._mostrar_mensaje_status(f"↶ Deshecho: {desc}")
+
+    def _rehacer(self):
+        desc = db.redo()
+        if desc:
+            self._refresh_all_tabs()
+            self._mostrar_mensaje_status(f"↷ Rehecho: {desc}")
+
+    def _on_global_undo(self, event=None):
+        widget = self.focus_get()
+        if isinstance(widget, (tk.Entry, tk.Text)):
+            # Permitir comportamiento estándar en cajas de texto
+            return
+        self._deshacer()
+
+    def _on_global_redo(self, event=None):
+        widget = self.focus_get()
+        if isinstance(widget, (tk.Entry, tk.Text)):
+            # Permitir comportamiento estándar en cajas de texto
+            return
+        self._rehacer()
 
     # ── Pestaña Edición ─────────────────────────
 
@@ -2580,6 +2703,7 @@ class StockApp(tk.Tk):
             self._toggle_modo_stock_rapido()
             return
         
+        db.save_state("Ajuste de stock rápido")
         cambios = 0
         from datetime import datetime
         ahora = datetime.now().isoformat()
@@ -3200,6 +3324,8 @@ class StockApp(tk.Tk):
             if list(self.cmb_marca["values"]) != marcas:
                 self.cmb_marca.config(values=marcas)
 
+        self._actualizar_botones_undo_redo()
+
     def _start_drag_sel_prod(self, event):
         tree = event.widget
         region = tree.identify_region(event.x, event.y)
@@ -3722,6 +3848,7 @@ class StockApp(tk.Tk):
             parent=self
         )
         if resp:
+            db.save_state("Vaciar historial")
             n = db.vaciar_movimientos()
             self.refresh_historial()
             messagebox.showinfo(
@@ -3931,6 +4058,7 @@ class StockApp(tk.Tk):
         dlg = ProductoDialog(self)
         if dlg.resultado:
             try:
+                db.save_state("Nuevo producto")
                 db.crear_producto(*dlg.resultado)
                 self.refresh_productos()
             except Exception as e:
@@ -3949,6 +4077,7 @@ class StockApp(tk.Tk):
             dlg = ProductoDialog(self, prod)
             if dlg.resultado:
                 try:
+                    db.save_state("Editar producto")
                     db.actualizar_producto(prod["id"], *dlg.resultado)
                     self.refresh_productos()
                 except Exception as e:
@@ -3958,6 +4087,7 @@ class StockApp(tk.Tk):
             dlg = EdicionMasivaDialog(self, count=len(ids))
             if dlg.resultado:
                 try:
+                    db.save_state("Edición masiva")
                     db.actualizar_productos_masivo(ids, dlg.resultado)
                     self.refresh_productos()
                     messagebox.showinfo("Edición Masiva", f"Se actualizaron {len(ids)} productos exitosamente.")
@@ -3980,6 +4110,7 @@ class StockApp(tk.Tk):
         ok = messagebox.askyesno("Confirmar eliminación", msg, icon="warning")
         
         if ok:
+            db.save_state("Eliminar producto")
             for pid in ids:
                 db.eliminar_producto(pid)
             
@@ -4034,6 +4165,7 @@ class StockApp(tk.Tk):
         if getattr(dlg, "carga_rapida", False):
             try:
                 filepath = dlg.filepath
+                db.save_state("Importación rápida")
                 nombres_nuevos, nombres_actualizados = db.importar_excel_estandar(filepath)
                 ImportacionResumenDialog(self, nombres_nuevos, nombres_actualizados)
                 self.refresh_productos()
@@ -4052,6 +4184,7 @@ class StockApp(tk.Tk):
                     messagebox.showinfo("Sin datos", "No se encontraron datos para importar.", parent=self)
                     return
 
+                db.save_state("Importar datos")
                 nombres_nuevos = []
                 nombres_actualizados = []
 
@@ -4310,6 +4443,7 @@ class SettingsDialog(tk.Toplevel):
     def _guardar_listas(self):
         cat_val = self.v_custom_cat.get().strip()
         marca_val = self.v_custom_marca.get().strip()
+        db.save_state("Guardar listas personalizadas")
         db.set_config("custom_categorias", cat_val)
         db.set_config("custom_marcas", marca_val)
         self.lbl_resultado_listas.config(text="✓ Listas guardadas correctamente")
@@ -4323,6 +4457,7 @@ class SettingsDialog(tk.Toplevel):
         except ValueError:
             messagebox.showerror('Valor invalido', 'Ingrese un numero entero >= 0.', parent=self)
             return
+        db.save_state("Cambiar stock mínimo")
         db.set_config('minimo_defecto', val)
         n = db.aplicar_minimo_defecto(val)
         self.lbl_resultado.config(
