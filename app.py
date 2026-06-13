@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 import database as db
 
-VERSION = "2.0.5"
+VERSION = "1.0.5"
 
 
 # ──────────────────────────────────────────────
