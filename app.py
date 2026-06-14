@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 import database as db
 
-VERSION = "1.0.12"
+VERSION = "1.0.13"
 
 
 # ──────────────────────────────────────────────
@@ -1488,17 +1488,22 @@ class ProductosOcultosDialog(tk.Toplevel):
         # Mantener el ordenamiento si existe
         if hasattr(self, "_sort_col") and self._sort_col:
             self._sort_column(self._sort_col, toggle=False)
-
     def _sort_column(self, col, toggle=True):
         items = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
         if toggle:
             rev = self._sort_col == col and not self._sort_rev
         else:
             rev = self._sort_rev if self._sort_col == col else False
-            
-        try:
-            items.sort(key=lambda t: float(t[0].replace("$","").replace(",","")) if t[0].replace("$","").replace(",","").replace(".","").isdigit() else t[0].lower(), reverse=rev)
-        except Exception:
+
+        if col == "precio":
+            def get_num(val_str):
+                cleaned = val_str.replace("$", "").replace(",", "").strip()
+                try:
+                    return float(cleaned)
+                except ValueError:
+                    return float('-inf')
+            items.sort(key=lambda t: get_num(t[0]), reverse=rev)
+        else:
             items.sort(key=lambda t: t[0].lower(), reverse=rev)
             
         for idx, (_, k) in enumerate(items):
@@ -4536,11 +4541,16 @@ class StockApp(tk.Tk):
         if col == "sel":
             # Si estamos ordenando por la columna de selección F2, forzar '[F2]' arriba (o abajo si rev)
             items.sort(key=lambda t: 0 if t[0] == "[F2]" else 1, reverse=rev)
+        elif col in ("stock", "minimo", "precio"):
+            def get_num(val_str):
+                cleaned = val_str.replace("$", "").replace(",", "").replace("Kg", "").replace("kg", "").strip()
+                try:
+                    return float(cleaned)
+                except ValueError:
+                    return float('-inf')
+            items.sort(key=lambda t: get_num(t[0]), reverse=rev)
         else:
-            try:
-                items.sort(key=lambda t: float(t[0].replace("$","").replace(",","")) if t[0].replace("$","").replace(",","").replace(".","").isdigit() else t[0].lower(), reverse=rev)
-            except Exception:
-                items.sort(key=lambda t: t[0].lower(), reverse=rev)
+            items.sort(key=lambda t: t[0].lower(), reverse=rev)
                 
         for idx, (_, k) in enumerate(items):
             self.tree.move(k, "", idx)
@@ -4559,11 +4569,16 @@ class StockApp(tk.Tk):
             
         if is_sel_col or col == "sel":
             items.sort(key=lambda t: 0 if t[0] == "[F2]" else 1, reverse=rev)
+        elif col in ("stock", "costo", "precio"):
+            def get_num(val_str):
+                cleaned = val_str.replace("$", "").replace(",", "").replace("Kg", "").replace("kg", "").strip()
+                try:
+                    return float(cleaned)
+                except ValueError:
+                    return float('-inf')
+            items.sort(key=lambda t: get_num(t[0]), reverse=rev)
         else:
-            try:
-                items.sort(key=lambda t: float(t[0].replace("$","").replace(",","")) if t[0].replace("$","").replace(",","").replace(".","").isdigit() else t[0].lower(), reverse=rev)
-            except Exception:
-                items.sort(key=lambda t: t[0].lower(), reverse=rev)
+            items.sort(key=lambda t: t[0].lower(), reverse=rev)
                 
         for idx, (_, k) in enumerate(items):
             self.tree_ed.move(k, "", idx)
