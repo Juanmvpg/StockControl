@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 import database as db
 
-VERSION = "1.0.11"
+VERSION = "1.0.12"
 
 
 # ──────────────────────────────────────────────
@@ -2571,25 +2571,14 @@ class StockApp(tk.Tk):
 
         self.tree_ed.bind("<Double-1>", lambda e: self._editar_producto_desde_tree_ed() if self.tree_ed.identify_region(e.x, e.y) == "cell" else None)
         
-        def _treeview_sort_column_ed(col_id, rev, is_sel_col=False):
-            items = [(self.tree_ed.set(k, col_id), k) for k in self.tree_ed.get_children("")]
-            if is_sel_col:
-                items.sort(key=lambda t: 0 if t[0] == "[F2]" else 1, reverse=rev)
-            else:
-                try:
-                    items.sort(key=lambda t: float(t[0].replace("$","")) if t[0].replace("$","").replace(".","").isdigit() else t[0].lower(), reverse=rev)
-                except Exception:
-                    items.sort(key=lambda t: t[0].lower(), reverse=rev)
-                    
-            for idx, (_, k) in enumerate(items):
-                self.tree_ed.move(k, "", idx)
-            self.tree_ed.heading(col_id, command=lambda _c=col_id: _treeview_sort_column_ed(_c, not rev, is_sel_col=is_sel_col))
+        self._sort_col_ed = None
+        self._sort_rev_ed = False
             
         for col in cols_ed:
             if col == "sel":
-                self.tree_ed.heading(col, command=lambda _c=col: _treeview_sort_column_ed(_c, False, is_sel_col=True))
+                self.tree_ed.heading(col, command=lambda _c=col: self._sort_column_ed(_c, toggle=True, is_sel_col=True))
             else:
-                self.tree_ed.heading(col, command=lambda _c=col: _treeview_sort_column_ed(_c, False))
+                self.tree_ed.heading(col, command=lambda _c=col: self._sort_column_ed(_c, toggle=True))
 
         self.tree_ed.bind("<ButtonRelease-1>", self._toggle_sel_prod)
         self.tree_ed.bind("<ButtonRelease-1>", self._iniciar_edicion_stock_celda, add="+")
@@ -3488,6 +3477,10 @@ class StockApp(tk.Tk):
             if list(self.cmb_marca["values"]) != marcas:
                 self.cmb_marca.config(values=marcas)
 
+        # Mantener el ordenamiento si existe
+        if hasattr(self, "_sort_col") and self._sort_col:
+            self._sort_column(self._sort_col, toggle=False)
+
         self._actualizar_botones_undo_redo()
 
     def _start_drag_sel_prod(self, event):
@@ -4176,6 +4169,10 @@ class StockApp(tk.Tk):
                                         f"${p.get('precio_costo',0):,.2f}", f"${p.get('precio',0):,.2f}"))
             visible_index += 1
             
+        # Mantener el ordenamiento si existe
+        if getattr(self, "_sort_col_ed", None):
+            self._sort_column_ed(self._sort_col_ed, toggle=False, is_sel_col=(self._sort_col_ed == "sel"))
+            
         if y_scroll_ed:
             try:
                 self.tree_ed.yview_moveto(y_scroll_ed[0])
@@ -4529,16 +4526,19 @@ class StockApp(tk.Tk):
 
 
 
-    def _sort_column(self, col):
+    def _sort_column(self, col, toggle=True):
         items = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
-        rev = self._sort_col == col and not self._sort_rev
+        if toggle:
+            rev = self._sort_col == col and not self._sort_rev
+        else:
+            rev = self._sort_rev if self._sort_col == col else False
         
         if col == "sel":
             # Si estamos ordenando por la columna de selección F2, forzar '[F2]' arriba (o abajo si rev)
             items.sort(key=lambda t: 0 if t[0] == "[F2]" else 1, reverse=rev)
         else:
             try:
-                items.sort(key=lambda t: float(t[0].replace("$","")) if t[0].replace("$","").replace(".","").isdigit() else t[0].lower(), reverse=rev)
+                items.sort(key=lambda t: float(t[0].replace("$","").replace(",","")) if t[0].replace("$","").replace(",","").replace(".","").isdigit() else t[0].lower(), reverse=rev)
             except Exception:
                 items.sort(key=lambda t: t[0].lower(), reverse=rev)
                 
@@ -4546,6 +4546,29 @@ class StockApp(tk.Tk):
             self.tree.move(k, "", idx)
         self._sort_col = col
         self._sort_rev = rev
+
+    def _sort_column_ed(self, col, toggle=True, is_sel_col=False):
+        if not hasattr(self, "tree_ed"):
+            return
+            
+        items = [(self.tree_ed.set(k, col), k) for k in self.tree_ed.get_children("")]
+        if toggle:
+            rev = getattr(self, "_sort_col_ed", None) == col and not getattr(self, "_sort_rev_ed", False)
+        else:
+            rev = getattr(self, "_sort_rev_ed", False) if getattr(self, "_sort_col_ed", None) == col else False
+            
+        if is_sel_col or col == "sel":
+            items.sort(key=lambda t: 0 if t[0] == "[F2]" else 1, reverse=rev)
+        else:
+            try:
+                items.sort(key=lambda t: float(t[0].replace("$","").replace(",","")) if t[0].replace("$","").replace(",","").replace(".","").isdigit() else t[0].lower(), reverse=rev)
+            except Exception:
+                items.sort(key=lambda t: t[0].lower(), reverse=rev)
+                
+        for idx, (_, k) in enumerate(items):
+            self.tree_ed.move(k, "", idx)
+        self._sort_col_ed = col
+        self._sort_rev_ed = rev
 
 
 # ──────────────────────────────────────────────
