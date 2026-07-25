@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 import database as db
 
-VERSION = "1.0.13"
+VERSION = "1.0.14"
 
 
 # ──────────────────────────────────────────────
@@ -4194,29 +4194,38 @@ class StockApp(tk.Tk):
 
     def _abrir_aumento(self):
         ids = self._get_selected_productos_ids()
-        productos = [db.get_producto_by_id(pid) for pid in ids]
+        if not ids:
+            return
+        productos = [db.get_producto_by_id(pid) for pid in ids if db.get_producto_by_id(pid)]
+        if not productos:
+            return
         dlg = AumentoMasivoDialog(self, productos_seleccionados=productos)
         if getattr(dlg, "resultado", False):
             self.refresh_productos()
             if hasattr(self, 'refresh_tab_edicion'):
                 self.refresh_tab_edicion()
 
-
-
-
-
     def _get_selected_productos_ids(self):
-        """Devuelve una lista de IDs de las selecciones explícitas, o fallback en Historial/Productos."""
-        tab = self.notebook.tab("current", "text").strip()
-        if "Edición" in tab or "Edicion" in tab:
-            return [int(s) for s in getattr(self, "_seleccionados", set())]
+        """Devuelve una lista de IDs de las selecciones explícitas, o fallback en Treeview selection."""
+        try:
+            is_edicion = (self.notebook.index("current") == 3)
+        except Exception:
+            tab = str(self.notebook.tab("current", "text")).lower()
+            is_edicion = ("edici" in tab or "f10" in tab)
+
+        if is_edicion:
+            sel = getattr(self, "_seleccionados", set())
+            if sel:
+                return [int(s) for s in sel]
+            elif hasattr(self, "tree_ed") and self.tree_ed.selection():
+                return [int(s) for s in self.tree_ed.selection()]
+            return []
         else:
             return [int(s) for s in self.tree.selection()]
 
     def _get_selected_producto(self):
         ids = self._get_selected_productos_ids()
         if not ids:
-            messagebox.showinfo("Selección", "Seleccione un producto de la lista.")
             return None
         return db.get_producto_by_id(ids[0])
 
@@ -4234,7 +4243,6 @@ class StockApp(tk.Tk):
     def _editar_producto(self):
         ids = self._get_selected_productos_ids()
         if not ids:
-            messagebox.showinfo("Selección", "Seleccione al menos un producto de la lista.")
             return
             
         if len(ids) == 1:
@@ -4266,7 +4274,6 @@ class StockApp(tk.Tk):
     def _eliminar_producto(self):
         ids = self._get_selected_productos_ids()
         if not ids:
-            messagebox.showinfo("Eliminar Producto", "Seleccione al menos un producto para eliminar.")
             return
 
         if len(ids) == 1:
@@ -4477,7 +4484,6 @@ class StockApp(tk.Tk):
         """Atajo F6. Visualiza/edita la nota del producto."""
         sel = self.tree.selection()
         if not sel:
-            messagebox.showinfo("INFO", "Seleccione al menos un producto para gestionar su nota.", parent=self)
             return
             
         edicion_bloqueada = not getattr(self, "v_edicion", None) or not self.v_edicion.get()
